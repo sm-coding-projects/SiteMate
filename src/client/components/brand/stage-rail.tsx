@@ -2,10 +2,11 @@ import { useCountUp } from "@/hooks/use-motion";
 import { BUILD_STAGES } from "@/lib/build-stages";
 import { cn } from "@/lib/utils";
 
-type State = "done" | "current" | "todo";
+export type RailState = "done" | "current" | "todo";
+type State = RailState;
 
 /** Survey-line node: done = solid ink, current = hi-vis with a soft pulse, to come = dashed outline. */
-function Node({ state, tone }: { state: State; tone: "paper" | "ink" }) {
+export function RailNode({ state, tone = "paper" }: { state: State; tone?: "paper" | "ink" }) {
 	return (
 		<span
 			className={cn(
@@ -71,7 +72,7 @@ export function StageRail({
 							/>
 						)}
 						<span className={cn(!horizontal && "pt-1")}>
-							<Node state={state} tone={tone} />
+							<RailNode state={state} tone={tone} />
 						</span>
 						<span
 							className={cn(

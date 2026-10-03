@@ -12,6 +12,10 @@ import { ApiRequestError } from "@/lib/api";
 import { AccountPage } from "@/pages/account";
 import { ActivityPage } from "@/pages/activity";
 import { LandingPage } from "@/pages/landing";
+import { ProjectActivityTab } from "@/pages/project/activity";
+import { ProjectLayout } from "@/pages/project/layout";
+import { NotesTab } from "@/pages/project/notes";
+import { StagesTab } from "@/pages/project/stages";
 import { ProjectsPage } from "@/pages/projects";
 import { SetupRequired } from "@/pages/setup-required";
 import { SignInPage } from "@/pages/sign-in";
@@ -41,6 +45,16 @@ const router = createBrowserRouter([
 				errorElement: <RouteError />,
 				children: [
 					{ path: "projects", element: <ProjectsPage /> },
+					{
+						path: "projects/:id",
+						element: <ProjectLayout />,
+						errorElement: <RouteError />,
+						children: [
+							{ index: true, element: <StagesTab />, errorElement: <RouteError /> },
+							{ path: "notes", element: <NotesTab />, errorElement: <RouteError /> },
+							{ path: "activity", element: <ProjectActivityTab />, errorElement: <RouteError /> },
+						],
+					},
 					{ path: "activity", element: <ActivityPage /> },
 					{ path: "account", element: <AccountPage /> },
 					{ path: "*", element: <Navigate to="/projects" replace /> },
