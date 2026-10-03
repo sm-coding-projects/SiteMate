@@ -51,7 +51,7 @@ const describe = (v) => {
 	return `${m ? m[1] : v.includes("@") ? "<email>" : "<set>"}…(${v.length} chars)`;
 };
 
-const [cmd, origin] = process.argv.slice(2);
+const [cmd, ...origins] = process.argv.slice(2);
 const vars = readDevVars();
 let missing = 0;
 for (const k of [...REQUIRED, ...OPTIONAL]) {
@@ -64,15 +64,16 @@ for (const k of [...REQUIRED, ...OPTIONAL]) {
 }
 if (cmd === "check") process.exit(missing ? 1 : 0);
 
-if (cmd !== "push" || !origin) {
-	console.error("Usage: node scripts/secrets.mjs check | push https://sitemate.<subdomain>.workers.dev");
+if (cmd !== "push" || origins.length === 0) {
+	console.error("Usage: node scripts/secrets.mjs check | push <app origin> [more origins…]");
 	process.exit(1);
 }
 if (missing) {
 	console.error("Fill in the required secrets first.");
 	process.exit(1);
 }
-const secrets = { AUTHORIZED_PARTIES: new URL(origin).origin };
+// Every origin the SPA is served from may send session tokens (app.bfhapp.com, plus the workers.dev fallback).
+const secrets = { AUTHORIZED_PARTIES: origins.map((o) => new URL(o).origin).join(",") };
 for (const k of [...REQUIRED, ...OPTIONAL]) if (vars[k]) secrets[k] = vars[k];
 const res = spawnSync("pnpm", ["wrangler", "secret", "bulk"], {
 	input: JSON.stringify(secrets),

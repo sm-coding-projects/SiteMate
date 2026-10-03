@@ -5,6 +5,8 @@ import type { Db } from "./db";
 type Vars =
 	| "APP_ENV"
 	| "APP_URL"
+	| "SITE_HOST"
+	| "APP_HOST"
 	| "R2_BUCKET"
 	| "AI_PROVIDER"
 	| "AI_GATEWAY_ID"

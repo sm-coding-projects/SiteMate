@@ -1,9 +1,9 @@
 import { SignIn, SignUp } from "@clerk/react";
-import { Link } from "react-router";
 import { HouseDrawing } from "@/components/brand/house-drawing";
 import { StageBar } from "@/components/brand/stage-bar";
 import { Wordmark } from "@/components/brand/wordmark";
 import { useStageSequence } from "@/hooks/use-motion";
+import { siteUrl } from "@/lib/hosts";
 
 const INK = "#0f1214";
 const HIVIS = "#e8ff3c";
@@ -49,9 +49,9 @@ export function SignInPage({ mode = "sign-in" }: { mode?: "sign-in" | "sign-up" 
 	return (
 		<div className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
 			<main className="flex flex-col px-4 py-6 md:px-10">
-				<Link to="/" viewTransition aria-label="BFH App home" className="self-start">
+				<a href={siteUrl("/")} aria-label="BFH App home" className="self-start">
 					<Wordmark />
-				</Link>
+				</a>
 				<div className="mx-auto flex w-full max-w-[420px] flex-1 flex-col justify-center py-10">
 					<div className="overflow-hidden rounded-md border bg-card">
 						<StageBar
@@ -81,9 +81,12 @@ export function SignInPage({ mode = "sign-in" }: { mode?: "sign-in" | "sign-up" 
 					</div>
 					<p className="mt-4 text-center text-sm text-muted-foreground">
 						New to BFH App?{" "}
-						<Link to="/#request-access" className="font-medium text-link underline-offset-4 hover:underline">
+						<a
+							href={siteUrl("/#request-access")}
+							className="font-medium text-link underline-offset-4 hover:underline"
+						>
 							Request access
-						</Link>
+						</a>
 					</p>
 				</div>
 			</main>

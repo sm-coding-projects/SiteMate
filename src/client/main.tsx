@@ -9,6 +9,7 @@ import { RequireAuth } from "@/components/require-auth";
 import { RouteError } from "@/components/route-error";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ApiRequestError } from "@/lib/api";
+import { siteUrl } from "@/lib/hosts";
 import { AccountPage } from "@/pages/account";
 import { ActivityPage } from "@/pages/activity";
 import { LandingPage } from "@/pages/landing";
@@ -94,7 +95,7 @@ createRoot(root).render(
 				publishableKey={publishableKey}
 				signInUrl="/sign-in"
 				signUpUrl="/sign-up"
-				afterSignOutUrl="/"
+				afterSignOutUrl={siteUrl("/")}
 				localization={{
 					signIn: {
 						start: {

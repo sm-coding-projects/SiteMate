@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useMe } from "@/hooks/use-me";
 import { type ThemePref, useTheme } from "@/hooks/use-theme";
+import { siteUrl } from "@/lib/hosts";
 import { cn } from "@/lib/utils";
 
 export const ROLE_LABEL = { admin: "Admin", viewer: "Viewer" } as const;
@@ -148,7 +149,7 @@ function UserMenu({ trigger, side }: { trigger: ReactNode; side: "top" | "bottom
 					</DropdownMenuRadioItem>
 				</DropdownMenuRadioGroup>
 				<DropdownMenuSeparator />
-				<DropdownMenuItem className="min-h-11" onSelect={() => signOut({ redirectUrl: "/" })}>
+				<DropdownMenuItem className="min-h-11" onSelect={() => signOut({ redirectUrl: siteUrl("/") })}>
 					<LogOut aria-hidden /> Sign out
 				</DropdownMenuItem>
 			</DropdownMenuContent>

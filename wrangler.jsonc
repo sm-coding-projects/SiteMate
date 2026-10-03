@@ -7,9 +7,19 @@
 	"compatibility_flags": ["nodejs_compat"],
 	"observability": { "enabled": true },
 	"assets": {
+		"binding": "ASSETS",
 		"not_found_handling": "single-page-application",
-		"run_worker_first": ["/api/*"]
+		// The Worker sees page requests (to send each hostname to its part of the site, src/worker/hosts.ts);
+		// built files under /assets and the favicon are served straight from the edge.
+		"run_worker_first": ["/*", "!/assets/*", "!/favicon.svg"]
 	},
+	// bfhapp.com serves the landing page, app.bfhapp.com the app. DNS and certificates are created on deploy.
+	"routes": [
+		{ "pattern": "bfhapp.com", "custom_domain": true },
+		{ "pattern": "app.bfhapp.com", "custom_domain": true }
+	],
+	// Keep sitemate.<subdomain>.workers.dev working as a fallback (serves everything on one origin).
+	"workers_dev": true,
 	"d1_databases": [
 		{
 			"binding": "DB",
@@ -44,8 +54,11 @@
 	"ai": { "binding": "AI", "remote": true },
 	"vars": {
 		"APP_ENV": "production",
-		// Public origin, used in email links. Also add it to AUTHORIZED_PARTIES (secret).
-		"APP_URL": "https://sitemate.example.workers.dev",
+		// Public origin of the app, used in email links. Also add it to AUTHORIZED_PARTIES (secret).
+		"APP_URL": "https://app.bfhapp.com",
+		// Landing page host and app host (see "routes"). Unset either to serve everything on every host.
+		"SITE_HOST": "bfhapp.com",
+		"APP_HOST": "app.bfhapp.com",
 		"R2_BUCKET": "sitemate-files",
 		// workers-ai | anthropic | openai-compatible. Falls back to workers-ai when the chosen provider has no key.
 		"AI_PROVIDER": "workers-ai",

@@ -133,7 +133,8 @@ node scripts/secrets.mjs check   # shows which are set (name + prefix only, neve
 | Name | Default | Purpose |
 |---|---|---|
 | `APP_ENV` | `production` | Shown by `/api/health` |
-| `APP_URL` | placeholder | Public origin, used in email links — **set it to your workers.dev URL** |
+| `APP_URL` | `https://app.bfhapp.com` | Public origin of the app, used in email links (`deploy.sh` overrides it with its first origin) |
+| `SITE_HOST`, `APP_HOST` | `bfhapp.com`, `app.bfhapp.com` | Landing-page host and app host (see Deploy) |
 | `R2_BUCKET` | `sitemate-files` | Bucket name for presigned URLs |
 | `AI_PROVIDER` | `workers-ai` | `workers-ai` \| `anthropic` \| `openai-compatible` (falls back to workers-ai without a key) |
 | `AI_GATEWAY_ID` | `sitemate` | AI Gateway every provider call goes through |
@@ -194,15 +195,25 @@ Worker must read the same one. You need `wrangler login` for that.
 
 ## Deploy
 
-Set `APP_URL` in `wrangler.jsonc` to `https://sitemate.<subdomain>.workers.dev`, then:
+The Worker answers on two hostnames (`routes` in `wrangler.jsonc`; Cloudflare creates their DNS records and
+certificates on deploy) plus the workers.dev fallback:
+
+| Host | Serves |
+|---|---|
+| `bfhapp.com` | The landing page. Every other path 301s to the same path on `app.bfhapp.com`; `www.` 301s to the bare domain |
+| `app.bfhapp.com` | The app, sign-in and `/api`. `/` 302s to `/projects` |
+| `sitemate.<subdomain>.workers.dev` | Everything, on one origin (unchanged) |
+
+Page requests run through the Worker first (`run_worker_first`) for this; built files under `/assets` don't.
+`SITE_HOST`/`APP_HOST` in `vars` set the two hosts (unset either to serve everything everywhere).
 
 ```bash
-scripts/deploy.sh https://sitemate.<subdomain>.workers.dev
+scripts/deploy.sh https://app.bfhapp.com https://sitemate.<subdomain>.workers.dev
 ```
 
-It checks secrets, runs typecheck/lint/tests, applies remote migrations, uploads secrets from `.dev.vars`
-(with `AUTHORIZED_PARTIES` set to the origin; values are piped, never printed), sets R2 CORS, builds,
-deploys and calls `/api/health`. To redeploy code only: `pnpm run deploy`. (Note: plain `pnpm deploy` is pnpm's
+The first origin becomes `APP_URL` (email links); all of them go into `AUTHORIZED_PARTIES` and the R2 CORS
+rules. It checks secrets, runs typecheck/lint/tests, applies remote migrations, uploads secrets from
+`.dev.vars` (values are piped, never printed), sets R2 CORS, builds, deploys and calls `/api/health`. To redeploy code only: `pnpm run deploy`. (Note: plain `pnpm deploy` is pnpm's
 own workspace command, not this script.)
 
 Watch the Worker and the queue consumer with `pnpm wrangler tail`.
