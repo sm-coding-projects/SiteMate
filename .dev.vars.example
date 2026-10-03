@@ -1,0 +1,14 @@
+# Copy to .dev.vars for local dev (never commit). For production, set secrets with
+# `wrangler secret put <NAME>` and vars in wrangler.jsonc.
+
+# Clerk (development instance) — Dashboard → API keys
+CLERK_SECRET_KEY=sk_test_xxx
+CLERK_PUBLISHABLE_KEY=pk_test_xxx
+# Optional: PEM public key (Dashboard → API keys → JWT public key). Lets the Worker
+# verify sessions without fetching JWKS from Clerk on cold start.
+# CLERK_JWT_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+
+# Comma-separated origins allowed to send Clerk session tokens (CSRF protection).
+AUTHORIZED_PARTIES=http://localhost:5173
+
+APP_ENV=development

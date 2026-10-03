@@ -1,0 +1,233 @@
+/*
+ * SiteMate design tokens — source of truth: design-system/sitemate/MASTER.md
+ * Contrast ratios for every pair are recorded there. Components use semantic tokens only.
+ */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/inter";
+
+/* Dark mode: OS preference unless the user picks a theme (data-theme on <html>). */
+@custom-variant dark {
+	&:where([data-theme="dark"], [data-theme="dark"] *) {
+		@slot;
+	}
+	@media (prefers-color-scheme: dark) {
+		&:where(:root:not([data-theme="light"]), :root:not([data-theme="light"]) *) {
+			@slot;
+		}
+	}
+}
+
+:root {
+	--radius: 0.5rem;
+
+	--background: #f8fafc;
+	--foreground: #0f172a;
+	--card: #ffffff;
+	--card-foreground: #0f172a;
+	--popover: #ffffff;
+	--popover-foreground: #0f172a;
+	--primary: #ea580c; /* safety orange */
+	--primary-hover: #c2410c;
+	--primary-foreground: #0b0f14;
+	--secondary: #e2e8f0;
+	--secondary-foreground: #0f172a;
+	--muted: #f1f5f9;
+	--muted-foreground: #475569;
+	--accent: #f1f5f9;
+	--accent-foreground: #0f172a;
+	--destructive: #b91c1c;
+	--destructive-foreground: #ffffff;
+	--success: #15803d;
+	--warning: #b45309;
+	--border: #cbd5e1;
+	--input: #64748b;
+	--ring: #0f172a;
+
+	--sidebar: #ffffff;
+	--sidebar-foreground: #0f172a;
+	--sidebar-accent: #f1f5f9;
+	--sidebar-border: #cbd5e1;
+
+	/* Status — always paired with an icon and a label. */
+	--status-not-started: #334155;
+	--status-not-started-bg: #f1f5f9;
+	--status-in-progress: #9a3412;
+	--status-in-progress-bg: #ffedd5;
+	--status-complete: #166534;
+	--status-complete-bg: #dcfce7;
+	--status-on-hold: #1e40af;
+	--status-on-hold-bg: #dbeafe;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root:not([data-theme="light"]) {
+		--background: #020617;
+		--foreground: #f1f5f9;
+		--card: #0f172a;
+		--card-foreground: #f1f5f9;
+		--popover: #0f172a;
+		--popover-foreground: #f1f5f9;
+		--primary: #f97316;
+		--primary-hover: #fb923c;
+		--primary-foreground: #0b0f14;
+		--secondary: #1e293b;
+		--secondary-foreground: #f1f5f9;
+		--muted: #1e293b;
+		--muted-foreground: #94a3b8;
+		--accent: #1e293b;
+		--accent-foreground: #f1f5f9;
+		--destructive: #f87171;
+		--destructive-foreground: #0b0f14;
+		--success: #4ade80;
+		--warning: #fbbf24;
+		--border: #334155;
+		--input: #64748b;
+		--ring: #fdba74;
+		--sidebar: #0f172a;
+		--sidebar-foreground: #f1f5f9;
+		--sidebar-accent: #1e293b;
+		--sidebar-border: #334155;
+		--status-not-started: #cbd5e1;
+		--status-not-started-bg: #1e293b;
+		--status-in-progress: #fdba74;
+		--status-in-progress-bg: #431407;
+		--status-complete: #86efac;
+		--status-complete-bg: #052e16;
+		--status-on-hold: #93c5fd;
+		--status-on-hold-bg: #172554;
+	}
+}
+
+:root[data-theme="dark"] {
+	--background: #020617;
+	--foreground: #f1f5f9;
+	--card: #0f172a;
+	--card-foreground: #f1f5f9;
+	--popover: #0f172a;
+	--popover-foreground: #f1f5f9;
+	--primary: #f97316;
+	--primary-hover: #fb923c;
+	--primary-foreground: #0b0f14;
+	--secondary: #1e293b;
+	--secondary-foreground: #f1f5f9;
+	--muted: #1e293b;
+	--muted-foreground: #94a3b8;
+	--accent: #1e293b;
+	--accent-foreground: #f1f5f9;
+	--destructive: #f87171;
+	--destructive-foreground: #0b0f14;
+	--success: #4ade80;
+	--warning: #fbbf24;
+	--border: #334155;
+	--input: #64748b;
+	--ring: #fdba74;
+	--sidebar: #0f172a;
+	--sidebar-foreground: #f1f5f9;
+	--sidebar-accent: #1e293b;
+	--sidebar-border: #334155;
+	--status-not-started: #cbd5e1;
+	--status-not-started-bg: #1e293b;
+	--status-in-progress: #fdba74;
+	--status-in-progress-bg: #431407;
+	--status-complete: #86efac;
+	--status-complete-bg: #052e16;
+	--status-on-hold: #93c5fd;
+	--status-on-hold-bg: #172554;
+}
+
+@theme inline {
+	--font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+	--font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+	--radius-sm: calc(var(--radius) - 2px);
+	--radius-md: var(--radius);
+	--radius-lg: calc(var(--radius) + 2px);
+	--radius-xl: calc(var(--radius) + 6px);
+
+	--color-background: var(--background);
+	--color-foreground: var(--foreground);
+	--color-card: var(--card);
+	--color-card-foreground: var(--card-foreground);
+	--color-popover: var(--popover);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-primary: var(--primary);
+	--color-primary-hover: var(--primary-hover);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-secondary: var(--secondary);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-muted: var(--muted);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-accent: var(--accent);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-destructive: var(--destructive);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-success: var(--success);
+	--color-warning: var(--warning);
+	--color-border: var(--border);
+	--color-input: var(--input);
+	--color-ring: var(--ring);
+	--color-sidebar: var(--sidebar);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-border: var(--sidebar-border);
+
+	--color-status-not-started: var(--status-not-started);
+	--color-status-not-started-bg: var(--status-not-started-bg);
+	--color-status-in-progress: var(--status-in-progress);
+	--color-status-in-progress-bg: var(--status-in-progress-bg);
+	--color-status-complete: var(--status-complete);
+	--color-status-complete-bg: var(--status-complete-bg);
+	--color-status-on-hold: var(--status-on-hold);
+	--color-status-on-hold-bg: var(--status-on-hold-bg);
+}
+
+@layer base {
+	* {
+		@apply border-border;
+	}
+	html {
+		-webkit-text-size-adjust: 100%;
+		color-scheme: light dark;
+	}
+	:root[data-theme="light"] {
+		color-scheme: light;
+	}
+	:root[data-theme="dark"] {
+		color-scheme: dark;
+	}
+	body {
+		@apply bg-background text-foreground font-sans antialiased;
+		font-size: 1rem;
+		line-height: 1.5;
+		overflow-x: hidden;
+	}
+	button:not(:disabled),
+	[role="button"]:not([aria-disabled="true"]),
+	a[href] {
+		cursor: pointer;
+	}
+	:focus-visible {
+		outline: 2px solid var(--ring);
+		outline-offset: 2px;
+	}
+	.tabular {
+		font-variant-numeric: tabular-nums;
+	}
+}
+
+/* !important is deliberate: reduced motion must beat any component transition. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		/* biome-ignore lint/complexity/noImportantStyles: reduced-motion override */
+		animation-duration: 0.01ms !important;
+		/* biome-ignore lint/complexity/noImportantStyles: reduced-motion override */
+		animation-iteration-count: 1 !important;
+		/* biome-ignore lint/complexity/noImportantStyles: reduced-motion override */
+		transition-duration: 0.01ms !important;
+		/* biome-ignore lint/complexity/noImportantStyles: reduced-motion override */
+		scroll-behavior: auto !important;
+	}
+}

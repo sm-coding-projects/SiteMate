@@ -1,0 +1,30 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "sitemate",
+	"main": "./src/worker/index.ts",
+	// Bump when upgrading wrangler; must not be newer than the bundled workerd.
+	"compatibility_date": "2026-10-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"observability": { "enabled": true },
+	"assets": {
+		"not_found_handling": "single-page-application",
+		"run_worker_first": ["/api/*"]
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "sitemate-db",
+			// Replace with the id printed by `wrangler d1 create sitemate-db --location oc`
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "migrations"
+		}
+	],
+	"r2_buckets": [{ "binding": "FILES", "bucket_name": "sitemate-files" }],
+	"queues": {
+		"producers": [{ "binding": "JOBS", "queue": "sitemate-jobs" }],
+		"consumers": [{ "queue": "sitemate-jobs", "max_batch_size": 10, "max_batch_timeout": 5 }]
+	},
+	"vars": {
+		"APP_ENV": "production"
+	}
+}
