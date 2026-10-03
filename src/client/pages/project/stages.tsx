@@ -37,7 +37,7 @@ import {
 } from "@/hooks/use-data";
 import { moveId, useDragReorder } from "@/hooks/use-drag-reorder";
 import { useMe } from "@/hooks/use-me";
-import { useDesktop, useFinePointer } from "@/hooks/use-media";
+import { useFinePointer, useWide } from "@/hooks/use-media";
 import { errorMessage } from "@/lib/api";
 import { formatDate, nbHyphen, stageCode } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -52,8 +52,12 @@ export function StagesTab() {
 	const stages = project.stages;
 	const current = currentStageNumber(stages);
 	const [params, setParams] = useSearchParams();
+	// Open on the current stage, then stay put: completing it shouldn't yank the checklist away mid-task.
+	const [initialId] = useState(() => stages[Math.min(current, stages.length) - 1]?.id);
 	const selectedId =
-		stages.find((s) => s.id === params.get("stage"))?.id ?? stages[Math.min(current, stages.length) - 1]?.id;
+		stages.find((s) => s.id === params.get("stage"))?.id ??
+		stages.find((s) => s.id === initialId)?.id ??
+		stages[Math.min(current, stages.length) - 1]?.id;
 	const select = (id: string) =>
 		setParams(
 			(p) => {
@@ -62,7 +66,7 @@ export function StagesTab() {
 			},
 			{ replace: true },
 		);
-	const desktop = useDesktop();
+	const desktop = useWide();
 	const fine = useFinePointer();
 	const reorder = useReorder(project.id);
 	const ids = stages.map((s) => s.id);
@@ -85,7 +89,7 @@ export function StagesTab() {
 	);
 
 	return (
-		<div className="grid gap-8 md:grid-cols-[18rem_minmax(0,1fr)] md:gap-10">
+		<div className="grid grid-cols-1 gap-8 lg:grid-cols-[18rem_minmax(0,1fr)] lg:gap-10">
 			<div>
 				<h2 className="label-mono mb-4 text-muted-foreground">
 					Stages · {stages.filter((s) => s.status === "complete").length}/{stages.length} complete

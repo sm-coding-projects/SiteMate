@@ -16,7 +16,8 @@
 		"db:migrate:remote": "wrangler d1 migrations apply sitemate-db --remote",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"r2:cors": "node scripts/r2-cors.mjs"
+		"r2:cors": "node scripts/r2-cors.mjs",
+		"test:e2e": "playwright test"
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "^0.131.0",
@@ -46,6 +47,7 @@
 		"@biomejs/biome": "^2.5.15",
 		"@cloudflare/vite-plugin": "^1.62.5",
 		"@cloudflare/vitest-pool-workers": "^0.22.0",
+		"@playwright/test": "~1.56.1",
 		"@tailwindcss/vite": "^4.3.3",
 		"@types/node": "^26.6.4",
 		"@types/react": "^19.3.0",

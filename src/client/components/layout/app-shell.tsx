@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from "react-router";
 import { Wordmark } from "@/components/brand/wordmark";
+import { OfflineBanner } from "@/components/offline-banner";
 import { UploadTray } from "@/components/upload-tray";
 import { useIsAdmin } from "@/hooks/use-me";
 import { cn } from "@/lib/utils";
@@ -13,7 +14,7 @@ export function AppShell() {
 	const nav = NAV.filter((n) => !n.adminOnly || isAdmin);
 	const mobileNav = nav.filter((n) => n.mobile);
 	return (
-		<div className="min-h-dvh md:grid md:grid-cols-[14rem_1fr]">
+		<div className="min-h-dvh md:grid md:grid-cols-[14rem_minmax(0,1fr)]">
 			<a
 				href="#main"
 				className="sr-only z-50 rounded-md bg-card px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
@@ -67,6 +68,7 @@ export function AppShell() {
 					<MobileUserMenu />
 				</header>
 
+				<OfflineBanner />
 				<main
 					id="main"
 					className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] md:px-10 md:py-10 md:pb-10"

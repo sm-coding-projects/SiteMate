@@ -147,7 +147,7 @@ export function ProjectsPage() {
 				</p>
 			) : (
 				<>
-					<ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+					<ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
 						{items.map((p, i) => (
 							<ProjectCard key={p.id} project={p} index={i} />
 						))}
@@ -287,7 +287,7 @@ function SetupStep({ n, title, children }: { n: number; title: string; children:
 
 function CardsSkeleton() {
 	return (
-		<div role="status" aria-busy="true" className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+		<div role="status" aria-busy="true" className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
 			<span className="sr-only">Loading projects</span>
 			{[0, 1, 2].map((i) => (
 				<Skeleton key={i} className="h-52 rounded-md" />

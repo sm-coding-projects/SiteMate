@@ -16,7 +16,7 @@ export function NotesTab() {
 	const notes = useNotes(project.id);
 	const items = notes.data?.pages.flatMap((p) => p.items) ?? [];
 	return (
-		<div className="grid max-w-3xl gap-8">
+		<div className="grid max-w-3xl grid-cols-1 gap-8">
 			{isAdmin && <NoteComposer />}
 			<section aria-labelledby="notes-h">
 				<h2 id="notes-h" className="label-mono mb-3 text-muted-foreground">

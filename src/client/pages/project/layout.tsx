@@ -212,7 +212,7 @@ function ProjectSkeleton() {
 			<Skeleton className="mt-2 h-5 w-56" />
 			<Skeleton className="mt-6 h-6 w-full" />
 			<Skeleton className="mt-6 h-11 w-full" />
-			<div className="mt-6 grid gap-6 md:grid-cols-[18rem_minmax(0,1fr)]">
+			<div className="mt-6 grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
 				<Skeleton className="h-96" />
 				<Skeleton className="h-96" />
 			</div>

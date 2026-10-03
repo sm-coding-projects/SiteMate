@@ -36,7 +36,7 @@ function SettingsRow({
 	return (
 		<section
 			aria-labelledby={id}
-			className="grid gap-4 border-t py-8 first:border-t-0 first:pt-0 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:gap-12"
+			className="grid gap-4 border-t py-8 first:border-t-0 first:pt-0 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:gap-12"
 		>
 			<div>
 				<h2 id={id} className="text-base font-semibold">

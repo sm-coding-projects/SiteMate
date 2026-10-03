@@ -25,7 +25,7 @@ import {
 	useRerunExtraction,
 } from "@/hooks/use-data";
 import { useIsAdmin } from "@/hooks/use-me";
-import { useDesktop } from "@/hooks/use-media";
+import { useWide } from "@/hooks/use-media";
 import { errorMessage } from "@/lib/api";
 import { centsToInput, formatCents, formatWhen, parseDollars } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -143,14 +143,14 @@ export function ReviewPage() {
 	const { id } = useParams();
 	const ex = useExtraction(id);
 	const isAdmin = useIsAdmin();
-	const desktop = useDesktop();
+	const desktop = useWide();
 
 	if (ex.isPending) {
 		return (
 			<div role="status" aria-busy="true">
 				<span className="sr-only">Loading</span>
 				<Skeleton className="h-9 w-72 max-w-full" />
-				<div className="mt-8 grid gap-6 md:grid-cols-2">
+				<div className="mt-8 grid gap-6 lg:grid-cols-2">
 					<Skeleton className="h-[60dvh]" />
 					<Skeleton className="h-[60dvh]" />
 				</div>
@@ -179,7 +179,7 @@ export function ReviewPage() {
 				<ExtractionBadge status={e.status} />
 			</div>
 
-			<div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] md:gap-8">
+			<div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8">
 				{desktop ? <DocumentPreview e={e} /> : <OpenDocumentButton fileId={e.file.id} />}
 				<div className="min-w-0">
 					{e.status === "queued" || e.status === "processing" ? (
@@ -424,7 +424,7 @@ function ReviewForm({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
 	};
 
 	return (
-		<form onSubmit={submit} className="grid gap-6">
+		<form onSubmit={submit} className="grid grid-cols-1 gap-6">
 			{e.status === "confirmed" && (
 				<p className="rounded-md border bg-card px-4 py-3 text-sm">
 					Confirmed{e.reviewedBy?.name ? ` by ${e.reviewedBy.name}` : ""}
@@ -432,7 +432,7 @@ function ReviewForm({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
 					{isAdmin && " Saving again updates the quote."}
 				</p>
 			)}
-			<fieldset disabled={readOnly || confirm.isPending} className="grid gap-4">
+			<fieldset disabled={readOnly || confirm.isPending} className="grid min-w-0 grid-cols-1 gap-4">
 				<legend className="sr-only">Document details</legend>
 				<div className="grid gap-4 sm:grid-cols-2">
 					<Field id="rv-type" label="Document type">

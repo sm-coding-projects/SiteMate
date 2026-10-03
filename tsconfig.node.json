@@ -5,5 +5,5 @@
 		"lib": ["ES2023"],
 		"types": ["node"]
 	},
-	"include": ["vite.config.ts", "drizzle.config.ts"]
+	"include": ["vite.config.ts", "vite.e2e.config.ts", "drizzle.config.ts", "playwright.config.ts"]
 }

@@ -12,7 +12,7 @@ export function useMediaQuery(query: string) {
 	return matches;
 }
 
-/** ≥768px: the sidebar layout (MASTER.md breakpoint). */
-export const useDesktop = () => useMediaQuery("(min-width: 768px)");
+/** ≥1024px: room for two columns beside the sidebar (stage rail + checklist, document + review form). */
+export const useWide = () => useMediaQuery("(min-width: 1024px)");
 /** Mouse or trackpad: drag-to-reorder is offered; touch gets up/down buttons instead. */
 export const useFinePointer = () => useMediaQuery("(pointer: fine)");

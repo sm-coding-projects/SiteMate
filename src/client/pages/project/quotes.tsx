@@ -55,7 +55,7 @@ export function QuotesTab() {
 	const waiting = (pending.data?.pages.flatMap((p) => p.items) ?? []).filter((e) => e.status !== "confirmed");
 
 	return (
-		<div className="grid gap-8">
+		<div className="grid grid-cols-1 gap-8">
 			{waiting.length > 0 && (
 				<section aria-labelledby="awaiting-h">
 					<h2 id="awaiting-h" className="label-mono mb-3 text-muted-foreground">
@@ -107,16 +107,16 @@ export function QuotesTab() {
 							By trade · accepted and pending
 						</h2>
 						<div className="overflow-x-auto rounded-md border bg-card">
-							<table className="w-full min-w-[32rem] text-sm">
+							<table className="w-full text-sm">
 								<thead>
 									<tr className="border-b text-left text-muted-foreground">
 										<th scope="col" className="px-4 py-2 font-medium">
 											Trade
 										</th>
-										<th scope="col" className="px-4 py-2 text-right font-medium">
+										<th scope="col" className="hidden px-4 py-2 text-right font-medium sm:table-cell">
 											Ex‑GST
 										</th>
-										<th scope="col" className="px-4 py-2 text-right font-medium">
+										<th scope="col" className="hidden px-4 py-2 text-right font-medium sm:table-cell">
 											GST
 										</th>
 										<th scope="col" className="px-4 py-2 text-right font-medium">
@@ -133,10 +133,10 @@ export function QuotesTab() {
 											<th scope="row" className="px-4 py-2 text-left font-medium">
 												{t.trade} <span className="label-mono text-muted-foreground">· {t.count}</span>
 											</th>
-											<td className="px-4 py-2 text-right">
+											<td className="hidden px-4 py-2 text-right sm:table-cell">
 												<Money cents={t.exGstCents} />
 											</td>
-											<td className="px-4 py-2 text-right">
+											<td className="hidden px-4 py-2 text-right sm:table-cell">
 												<Money cents={t.gstCents} />
 											</td>
 											<td className="px-4 py-2 text-right">
