@@ -111,19 +111,33 @@ function workersAi(env: Bindings): Provider {
 		},
 		async json(input, prompt, schemaName, schema) {
 			if (input.kind !== "text") throw new Error("Workers AI needs text input");
-			const out = await env.AI.run(
-				model,
-				{
-					messages: [
-						{ role: "system", content: SYSTEM_PROMPT },
-						{ role: "user", content: prompt(input.text) },
-					],
-					response_format: { type: "json_schema", json_schema: schema },
-					max_tokens: 4096,
-					temperature: 0,
-				},
-				gatewayOptions(env, { step: schemaName }),
-			);
+			const messages = [
+				{ role: "system", content: SYSTEM_PROMPT },
+				{ role: "user", content: prompt(input.text) },
+			];
+			const run = (
+				response_format: { type: "json_schema" | "json_object"; json_schema?: unknown },
+				msgs = messages,
+			) =>
+				env.AI.run(
+					model,
+					{ messages: msgs, response_format, max_tokens: 4096, temperature: 0 },
+					gatewayOptions(env, { step: schemaName }),
+				);
+			let out: unknown;
+			try {
+				out = await run({ type: "json_schema", json_schema: schema });
+			} catch (err) {
+				// If the model rejects this schema shape, fall back to JSON mode with the schema in the prompt.
+				console.warn("json_schema mode failed, retrying in json_object mode", String(err));
+				out = await run({ type: "json_object" }, [
+					{
+						role: "system",
+						content: `${SYSTEM_PROMPT}\nReply with one JSON object matching this JSON Schema:\n${JSON.stringify(schema)}`,
+					},
+					messages[1] as { role: string; content: string },
+				]);
+			}
 			return parseJsonLoose((out as { response?: unknown }).response);
 		},
 	};

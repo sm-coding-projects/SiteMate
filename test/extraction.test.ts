@@ -14,7 +14,7 @@ Quote Q-1042 · Date 20/09/2026 · Valid 90 days
 Subtotal $30,000.00 · GST $3,000.00 · Total $33,000.00`;
 
 /** A stand-in for the Workers AI binding: toMarkdown + a JSON-mode model keyed on the schema it's asked for. */
-function fakeAi(opts: { failRun?: boolean } = {}) {
+function fakeAi(opts: { failRun?: boolean; rejectSchema?: boolean } = {}) {
 	const calls: string[] = [];
 	const ai = {
 		calls,
@@ -183,6 +183,18 @@ describe("AI extraction pipeline", () => {
 		});
 		const n = await env.DB.prepare("select count(*) n from suppliers").first<{ n: number }>();
 		expect(n?.n).toBe(1);
+	});
+
+	it("falls back to JSON mode when the model rejects the schema", async () => {
+		const projectId = await createProject();
+		const extractionId = await uploadQuote(projectId);
+		await consume({ type: "extract", extractionId }, {
+			...env,
+			AI: fakeAi({ rejectSchema: true }),
+		} as unknown as Bindings);
+		const ex = await api<ExtractionDetail>(`/extractions/${extractionId}`, { as: ADMIN });
+		expect(ex.body.status).toBe("needs_review");
+		expect(ex.body.fields?.quote?.quoteNumber).toBe("Q-1042");
 	});
 
 	it("retries transient failures, then marks failed; re-run queues it again", async () => {

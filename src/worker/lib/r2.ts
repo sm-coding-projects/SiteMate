@@ -15,13 +15,21 @@ type R2Env = Pick<Bindings, "R2_ACCOUNT_ID" | "R2_ACCESS_KEY_ID" | "R2_SECRET_AC
 export const r2Configured = (env: R2Env) =>
 	Boolean(env.R2_ACCOUNT_ID && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY);
 
+// One client per isolate and key: aws4fetch caches the derived signing key on the instance, so signing a
+// page of thumbnails costs one HMAC chain instead of one per URL (Workers free plan: 10 ms CPU/request).
+let cached: { id: string; client: AwsClient } | null = null;
+
 function client(env: R2Env) {
-	return new AwsClient({
+	const id = env.R2_ACCESS_KEY_ID ?? "";
+	if (cached?.id === id) return cached.client;
+	const c = new AwsClient({
 		accessKeyId: env.R2_ACCESS_KEY_ID ?? "",
 		secretAccessKey: env.R2_SECRET_ACCESS_KEY ?? "",
 		service: "s3",
 		region: "auto",
 	});
+	cached = { id, client: c };
+	return c;
 }
 
 const objectUrl = (env: R2Env, key: string) =>
