@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation } from "react-router";
 import { Wordmark } from "@/components/brand/wordmark";
 import { UploadTray } from "@/components/upload-tray";
+import { useIsAdmin } from "@/hooks/use-me";
 import { cn } from "@/lib/utils";
 import { ICON_PROPS, NAV } from "./nav";
 import { MobileUserMenu, SidebarUser } from "./user-menu";
@@ -8,6 +9,9 @@ import { MobileUserMenu, SidebarUser } from "./user-menu";
 /** Desktop (≥768px): left sidebar. Mobile: top bar + bottom tab bar. */
 export function AppShell() {
 	const { pathname } = useLocation();
+	const isAdmin = useIsAdmin();
+	const nav = NAV.filter((n) => !n.adminOnly || isAdmin);
+	const mobileNav = nav.filter((n) => n.mobile);
 	return (
 		<div className="min-h-dvh md:grid md:grid-cols-[14rem_1fr]">
 			<a
@@ -27,26 +31,28 @@ export function AppShell() {
 						Workspace
 					</p>
 					<ul className="space-y-0.5">
-						{NAV.filter((n) => n.group === "workspace").map(({ to, label, icon: Icon }) => (
-							<li key={to}>
-								<NavLink
-									to={to}
-									className={({ isActive }) =>
-										cn(
-											"relative flex min-h-11 items-center gap-3 rounded-md px-3 text-[0.9375rem] font-medium transition-colors duration-[120ms] ease-enter",
-											// Active = hi-vis bar (with ink edge) + ink label. No fill, no weight change.
-											"before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-[1px] before:transition-colors before:duration-200",
-											isActive
-												? "text-foreground before:bg-hivis before:shadow-[inset_0_0_0_1px_var(--primary-edge)]"
-												: "text-muted-foreground before:bg-transparent hover:bg-sidebar-accent hover:text-foreground",
-										)
-									}
-								>
-									<Icon {...ICON_PROPS} />
-									{label}
-								</NavLink>
-							</li>
-						))}
+						{nav
+							.filter((n) => n.group === "workspace")
+							.map(({ to, label, icon: Icon }) => (
+								<li key={to}>
+									<NavLink
+										to={to}
+										className={({ isActive }) =>
+											cn(
+												"relative flex min-h-11 items-center gap-3 rounded-md px-3 text-[0.9375rem] font-medium transition-colors duration-[120ms] ease-enter",
+												// Active = hi-vis bar (with ink edge) + ink label. No fill, no weight change.
+												"before:absolute before:inset-y-2 before:left-0 before:w-1 before:rounded-[1px] before:transition-colors before:duration-200",
+												isActive
+													? "text-foreground before:bg-hivis before:shadow-[inset_0_0_0_1px_var(--primary-edge)]"
+													: "text-muted-foreground before:bg-transparent hover:bg-sidebar-accent hover:text-foreground",
+											)
+										}
+									>
+										<Icon {...ICON_PROPS} />
+										{label}
+									</NavLink>
+								</li>
+							))}
 					</ul>
 				</nav>
 				<div className="border-t border-sidebar-border p-3">
@@ -77,9 +83,9 @@ export function AppShell() {
 			{/* Mobile bottom tab bar */}
 			<nav
 				aria-label="Main"
-				className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t bg-sidebar pb-[env(safe-area-inset-bottom)] md:hidden"
+				className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-sidebar pb-[env(safe-area-inset-bottom)] md:hidden"
 			>
-				{NAV.map(({ to, label, icon: Icon }) => (
+				{mobileNav.map(({ to, label, icon: Icon }) => (
 					<NavLink
 						key={to}
 						to={to}

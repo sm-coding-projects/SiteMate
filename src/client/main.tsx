@@ -17,8 +17,10 @@ import { DocumentsTab } from "@/pages/project/documents";
 import { ProjectLayout } from "@/pages/project/layout";
 import { NotesTab } from "@/pages/project/notes";
 import { PhotosTab } from "@/pages/project/photos";
+import { QuotesTab } from "@/pages/project/quotes";
 import { StagesTab } from "@/pages/project/stages";
 import { ProjectsPage } from "@/pages/projects";
+import { ReviewInboxPage, ReviewPage } from "@/pages/review";
 import { SetupRequired } from "@/pages/setup-required";
 import { SignInPage } from "@/pages/sign-in";
 
@@ -55,10 +57,13 @@ const router = createBrowserRouter([
 							{ index: true, element: <StagesTab />, errorElement: <RouteError /> },
 							{ path: "photos", element: <PhotosTab />, errorElement: <RouteError /> },
 							{ path: "documents", element: <DocumentsTab />, errorElement: <RouteError /> },
+							{ path: "quotes", element: <QuotesTab />, errorElement: <RouteError /> },
 							{ path: "notes", element: <NotesTab />, errorElement: <RouteError /> },
 							{ path: "activity", element: <ProjectActivityTab />, errorElement: <RouteError /> },
 						],
 					},
+					{ path: "review", element: <ReviewInboxPage />, errorElement: <RouteError /> },
+					{ path: "review/:id", element: <ReviewPage />, errorElement: <RouteError /> },
 					{ path: "activity", element: <ActivityPage /> },
 					{ path: "account", element: <AccountPage /> },
 					{ path: "*", element: <Navigate to="/projects" replace /> },

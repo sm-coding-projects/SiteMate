@@ -286,7 +286,7 @@ export const extractionConfirm = z.discriminatedUnion("documentType", [
 		stageId: idSchema.nullable().optional(),
 	}),
 	z.object({
-		documentType: z.enum(DOCUMENT_TYPES.filter((t) => t !== "quote") as [string, ...string[]]),
+		documentType: z.enum(["invoice", "certificate", "plan", "contract", "other"]),
 		fields: genericFields,
 		stageId: idSchema.nullable().optional(),
 	}),

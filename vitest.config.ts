@@ -13,6 +13,8 @@ export default defineConfig(async () => {
 				miniflare: {
 					// The pool's bundled workerd lags wrangler's; tests pin the newest date it supports.
 					compatibilityDate: "2026-08-22",
+					// Tests drive the queue consumer by hand; produce to a queue nothing consumes.
+					queueProducers: { JOBS: { queueName: "sitemate-jobs-test" } },
 					bindings: {
 						TEST_MIGRATIONS: migrations,
 						APP_ENV: "test",
