@@ -1,11 +1,11 @@
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ulid } from "ulid";
 import { z } from "zod";
-import { activity, emailLog, ROLES, users } from "../../db/schema";
+import { activity, emailLog, projectAccess, projects, ROLES, users } from "../../db/schema";
 import type { JobMessage, Role, Team } from "../../shared/api-types";
-import { idSchema, inviteCreate, roleUpdate } from "../../shared/schemas";
+import { idSchema, inviteCreate, projectAccessUpdate, roleUpdate } from "../../shared/schemas";
 import type { Db } from "../db";
 import { logActivity } from "../lib/activity";
 import { badRequest, zv } from "../lib/validate";
@@ -13,6 +13,14 @@ import { requireRole } from "../middleware/auth";
 import type { AppEnv } from "../types";
 
 const toRole = (v: unknown): Role => (ROLES.includes(v as Role) ? (v as Role) : "viewer");
+const toIds = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x) => typeof x === "string") : []);
+
+/** Drops ids that aren't projects (deleted, or never were). */
+async function existingProjectIds(db: Db, ids: string[]) {
+	if (ids.length === 0) return [];
+	const rows = await db.select({ id: projects.id }).from(projects).where(inArray(projects.id, ids));
+	return rows.map((r) => r.id);
+}
 const userParam = z.object({ id: idSchema });
 
 type ClerkUser = {
@@ -99,11 +107,20 @@ export const adminRoutes = new Hono<AppEnv>()
 
 	.get("/team", async (c) => {
 		const clerk = c.get("clerk");
+		const db = c.get("db");
 		const [list, invites] = await Promise.all([
 			clerk.users.getUserList({ limit: 100, orderBy: "-created_at" }),
 			clerk.invitations.getInvitationList({ status: "pending", limit: 100 }),
 		]).catch(clerkError);
+		const [projectRows, accessRows] = await db.batch([
+			db
+				.select({ id: projects.id, name: projects.name, status: projects.status })
+				.from(projects)
+				.orderBy(asc(projects.name)),
+			db.select({ userId: projectAccess.userId, projectId: projectAccess.projectId }).from(projectAccess),
+		]);
 		const team: Team = {
+			projects: projectRows.map((p) => ({ id: p.id, name: p.name, archived: p.status === "archived" })),
 			members: list.data.map((u) => ({
 				id: u.id,
 				email: u.primaryEmailAddress?.emailAddress ?? u.emailAddresses[0]?.emailAddress ?? "",
@@ -112,6 +129,7 @@ export const adminRoutes = new Hono<AppEnv>()
 				imageUrl: u.hasImage ? u.imageUrl : null,
 				lastSignInAt: u.lastSignInAt,
 				accessRemoved: u.banned,
+				projectIds: accessRows.filter((a) => a.userId === u.id).map((a) => a.projectId),
 				createdAt: u.createdAt,
 			})),
 			invitations: invites.data.map((i) => ({
@@ -119,6 +137,7 @@ export const adminRoutes = new Hono<AppEnv>()
 				email: i.emailAddress,
 				role: toRole(i.publicMetadata?.role),
 				status: i.status,
+				projectIds: toIds(i.publicMetadata?.projectIds),
 				createdAt: i.createdAt,
 			})),
 		};
@@ -128,12 +147,15 @@ export const adminRoutes = new Hono<AppEnv>()
 	.post("/invitations", zv("json", inviteCreate), async (c) => {
 		const user = c.get("user");
 		const { email, role } = c.req.valid("json");
+		// Copied into the user's publicMetadata on sign-up; requireUser() turns it into project_access rows.
+		const projectIds =
+			role === "viewer" ? await existingProjectIds(c.get("db"), c.req.valid("json").projectIds) : [];
 		const appUrl = (c.env.APP_URL || new URL(c.req.url).origin).replace(/\/$/, "");
 		const invitation = await c
 			.get("clerk")
 			.invitations.createInvitation({
 				emailAddress: email,
-				publicMetadata: { role },
+				publicMetadata: role === "viewer" ? { role, projectIds } : { role },
 				// The invite link lands on our <SignUp>, which redeems Clerk's ticket (sign-up is invite-only).
 				redirectUrl: `${appUrl}/sign-up`,
 				notify: true,
@@ -144,9 +166,9 @@ export const adminRoutes = new Hono<AppEnv>()
 			action: "user.invited",
 			entityType: "invitation",
 			entityId: invitation.id,
-			meta: { email, role },
+			meta: { email, role, projects: projectIds.length },
 		});
-		return c.json({ id: invitation.id, email, role, status: invitation.status }, 201);
+		return c.json({ id: invitation.id, email, role, projectIds, status: invitation.status }, 201);
 	})
 
 	.delete("/invitations/:id", zv("param", userParam), async (c) => {
@@ -201,6 +223,44 @@ export const adminRoutes = new Hono<AppEnv>()
 			}),
 		]);
 		return c.json({ id, deleted: true });
+	})
+
+	/** Replaces the set of projects a viewer can see. */
+	.put("/users/:id/projects", zv("param", userParam), zv("json", projectAccessUpdate), async (c) => {
+		const me = c.get("user");
+		const { id } = c.req.valid("param");
+		const db = c.get("db");
+		const target = await c.get("clerk").users.getUser(id).catch(clerkError);
+		if (toRole(target.publicMetadata?.role) !== "viewer") {
+			throw badRequest("Admins see every project. Only viewers get a project list.");
+		}
+		const email = emailOf(target);
+		const ids = await existingProjectIds(db, c.req.valid("json").projectIds);
+		const now = Date.now();
+		// They may not have opened the app since accepting; access rows need their users row.
+		await db
+			.insert(users)
+			.values({
+				id,
+				email,
+				name: [target.firstName, target.lastName].filter(Boolean).join(" ") || null,
+				role: "viewer",
+				createdAt: now,
+				updatedAt: now,
+			})
+			.onConflictDoNothing();
+		await db.batch([
+			db.delete(projectAccess).where(eq(projectAccess.userId, id)),
+			...ids.map((projectId) => db.insert(projectAccess).values({ projectId, userId: id, grantedBy: me.id })),
+			logActivity(db, {
+				actorId: me.id,
+				action: "user.projects_changed",
+				entityType: "user",
+				entityId: id,
+				meta: { email, projects: ids.length },
+			}),
+		]);
+		return c.json({ id, projectIds: ids });
 	})
 
 	.patch("/users/:id/role", zv("param", userParam), zv("json", roleUpdate), async (c) => {

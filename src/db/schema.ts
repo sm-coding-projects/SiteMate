@@ -257,6 +257,25 @@ export const itemFiles = sqliteTable(
 	(t) => [primaryKey({ columns: [t.itemId, t.fileId] }), index("item_files_file_idx").on(t.fileId)],
 );
 
+/**
+ * Projects a viewer may see. Admins see every project and have no rows here. Seeded on a viewer's first
+ * sign-in from their invitation's publicMetadata.projectIds, then edited from Team.
+ */
+export const projectAccess = sqliteTable(
+	"project_access",
+	{
+		projectId: text("project_id")
+			.notNull()
+			.references(() => projects.id, { onDelete: "cascade" }),
+		userId: text("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "cascade" }),
+		grantedBy: text("granted_by").references(() => users.id),
+		createdAt: createdAt(),
+	},
+	(t) => [primaryKey({ columns: [t.projectId, t.userId] }), index("project_access_user_idx").on(t.userId)],
+);
+
 // ── Step 5: AI extraction & quotes ──────────────────────────────────────────
 
 export const documentExtractions = sqliteTable(

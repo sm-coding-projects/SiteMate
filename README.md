@@ -98,8 +98,10 @@ In the [Clerk dashboard](https://dashboard.clerk.com), for **each** instance:
    account to the user by email.
 
 After that, invite everyone else from **BFH App → Team** (Clerk emails the invitation; the role is stored in
-`publicMetadata.role`). Anyone without `"role": "admin"` is a read-only **viewer**. Role changes reach a session
-when its token refreshes (within about a minute). Users don't carry over between instances: invite people again
+`publicMetadata.role`). Anyone without `"role": "admin"` is a read-only **viewer** who sees only the projects
+shared with them: pick them in the invite, or later from the member's **⋯ → Projects…** (stored in
+`project_access`; a viewer with none sees an empty list). Viewers get no sidebar, Review or workspace Activity.
+Role changes reach a session when its token refreshes (within about a minute). Users don't carry over between instances: invite people again
 in production.
 
 **Production instance, once.** Create it from the instance switcher (clone the development settings), with
@@ -258,7 +260,9 @@ Watch the Worker and the queue consumer with `pnpm wrangler tail`.
 ## API
 
 All routes are under `/api`. Every write route requires the `admin` role (`requireRole("admin")`); viewers get
-403. Bodies, queries and params are validated with the Zod schemas in `src/shared/schemas.ts`.
+403. Viewers can read only projects in their `project_access` rows (`src/worker/lib/access.ts`): anything under
+`/projects/:id`, plus `/files/:id/url` and `/stages/:id/items`, answers 404 otherwise, and `/activity`,
+`/extractions`, `/suppliers` and `/templates` are admin-only. Bodies, queries and params are validated with the Zod schemas in `src/shared/schemas.ts`.
 
 | Route | Purpose |
 |---|---|
@@ -277,7 +281,7 @@ All routes are under `/api`. Every write route requires the `admin` role (`requi
 | `GET /extractions`, `GET /extractions/:id` | Review queue and detail |
 | `POST /extractions/:id/rerun`, `POST /extractions/:id/confirm` | Re-run; confirm (creates supplier + quote) |
 | `GET /projects/:id/quotes`, `PATCH /quotes/:id/status`, `GET /suppliers` | Quotes with totals; accept/reject |
-| `GET /admin/team`, `POST /admin/invitations`, `DELETE /admin/invitations/:id`, `PATCH /admin/users/:id/role` | Team (Clerk) |
+| `GET /admin/team`, `POST /admin/invitations`, `DELETE /admin/invitations/:id`, `PATCH /admin/users/:id/role`, `PUT /admin/users/:id/projects`, `POST /admin/users/:id/remove-access`, `POST /admin/users/:id/restore-access`, `DELETE /admin/users/:id` | Team (Clerk); viewers' projects |
 | `POST /admin/test-email`, `GET /admin/email-log`, `POST /admin/queue-ping` | Ops checks |
 
 ## Free-tier budget

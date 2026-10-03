@@ -3,9 +3,17 @@
  * EMAIL_MODE=sandbox (default, no verified domain): every email goes to EMAIL_SANDBOX_TO with the intended
  * recipient in the subject. A rolling 24 h cap (EMAIL_DAILY_LIMIT, default 90) keeps us under Resend's 100/day.
  */
-import { and, eq, gte, isNull, ne, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, ne, or, sql } from "drizzle-orm";
 import { ulid } from "ulid";
-import { documentExtractions, emailLog, files, projectStages, projects, users } from "../db/schema";
+import {
+	documentExtractions,
+	emailLog,
+	files,
+	projectAccess,
+	projectStages,
+	projects,
+	users,
+} from "../db/schema";
 import type { ExtractionFields, JobMessage } from "../shared/api-types";
 import { createDb, type Db } from "./db";
 import type { Bindings } from "./types";
@@ -53,9 +61,18 @@ ${e.lines.map((l) => `<p style="margin:0 0 8px;font-size:15px;line-height:1.5">$
 	return { html, text };
 }
 
-async function recipients(db: Db, opts: { adminsOnly: boolean; exclude?: string }) {
+/** Admins, plus (unless adminsOnly) viewers who can see `projectId`. */
+async function recipients(db: Db, opts: { adminsOnly: boolean; projectId?: string; exclude?: string }) {
 	const where = [eq(users.emailNotifications, true), isNull(users.accessRevokedAt)];
-	if (opts.adminsOnly) where.push(eq(users.role, "admin"));
+	if (opts.adminsOnly || !opts.projectId) where.push(eq(users.role, "admin"));
+	else {
+		const viewer = and(
+			eq(users.role, "viewer"),
+			sql`exists (select 1 from ${projectAccess} where ${projectAccess.userId} = ${users.id} and ${projectAccess.projectId} = ${opts.projectId})`,
+		);
+		const either = or(eq(users.role, "admin"), viewer);
+		if (either) where.push(either);
+	}
 	if (opts.exclude) where.push(ne(users.id, opts.exclude));
 	return db
 		.select({ email: users.email, name: users.name })
@@ -100,7 +117,7 @@ async function buildEmails(env: Bindings, db: Db, msg: NotifyMessage): Promise<E
 			sql`select sum(status = 'complete') as done, count(*) as total from project_stages where project_id = ${row.projectId}`,
 		);
 		const c = counts[0];
-		const to = await recipients(db, { adminsOnly: false, exclude: msg.actorId });
+		const to = await recipients(db, { adminsOnly: false, projectId: row.projectId, exclude: msg.actorId });
 		return to.map((r) => ({
 			kind: "stage_completed",
 			key: `stage_completed:${msg.stageId}:${r.email}`,

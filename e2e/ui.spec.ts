@@ -54,6 +54,10 @@ test.describe("viewer is read-only in the UI", () => {
 		await page.goto("/projects");
 		await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
 		await expect(page.getByRole("button", { name: /new project/i })).toHaveCount(0);
+		if (SHOTS) await page.screenshot({ path: `${SHOTS}/viewer-projects-375.png`, fullPage: true });
+		// No sidebar or tab bar (a project's own Activity tab stays; see below).
+		await expect(page.getByRole("navigation", { name: "Main" })).toHaveCount(0);
+		await expect(page.getByRole("link", { name: /^(review|activity|team)$/i })).toHaveCount(0);
 
 		await page.goto("/projects/p1");
 		await expect(page.getByRole("heading", { name: "Frame" })).toBeVisible();
@@ -74,12 +78,11 @@ test.describe("viewer is read-only in the UI", () => {
 		await page.goto("/projects/p1/quotes");
 		await expect(page.getByRole("button", { name: /accept|reject/i })).toHaveCount(0);
 
-		await page.goto("/review/e1");
-		await expect(page.getByLabel("Supplier", { exact: true })).toBeDisabled();
-		await expect(page.getByRole("button", { name: /confirm/i })).toHaveCount(0);
-
-		await page.goto("/team");
-		await expect(page).toHaveURL(/\/projects$/);
+		// The workspace-wide pages send them back to their projects.
+		for (const path of ["/review", "/review/e1", "/activity", "/team"]) {
+			await page.goto(path);
+			await expect(page, path).toHaveURL(/\/projects$/);
+		}
 		expect(api.writes).toEqual([]);
 	});
 });
@@ -232,6 +235,39 @@ test.describe("team access", () => {
 			expect(writes).toContain("DELETE /admin/users/u2");
 		});
 	}
+
+	test("admins choose which projects a viewer sees", async ({ page }) => {
+		const { writes } = await installApi(page, "admin");
+		await page.goto("/team");
+		await expect(page.getByText("Sees 1 project")).toBeVisible();
+		await expect(page.getByText("Viewer · 2 projects · sent")).toBeVisible();
+
+		await page.getByRole("button", { name: "Actions for Priya Patel" }).click();
+		await page.getByRole("menuitem", { name: "Projects…" }).click();
+		const dialog = page.getByRole("dialog", { name: "Projects for Priya Patel" });
+		await expect(dialog.getByRole("checkbox", { name: "14 Banksia St" })).toBeChecked();
+		await dialog.getByRole("checkbox", { name: "8 Kurrajong Ave" }).check();
+		await expect(dialog.getByText("They'll see 2 projects and nothing else.")).toBeVisible();
+		if (SHOTS) await dialog.screenshot({ path: `${SHOTS}/team-projects-dialog.png` });
+		await dialog.getByRole("button", { name: "Save" }).click();
+		await expect(dialog).toBeHidden();
+		expect(writes).toContain("PUT /admin/users/u2/projects");
+
+		await page.getByRole("button", { name: "Invite" }).click();
+		const invite = page.getByRole("dialog", { name: "Invite someone" });
+		await invite.getByLabel("Email").fill("site.client@example.com");
+		await expect(invite.getByText("They'll see nothing until you share a project.")).toBeVisible();
+		await invite.getByRole("checkbox", { name: "14 Banksia St" }).check();
+		if (SHOTS) await invite.screenshot({ path: `${SHOTS}/team-invite-dialog.png` });
+		await invite.getByRole("button", { name: "Send invitation" }).click();
+		await expect(invite).toBeHidden();
+		expect(writes).toContain("POST /admin/invitations");
+
+		// Admins see everything, so there's no project list to manage for them.
+		await page.getByRole("button", { name: "Invite" }).click();
+		await page.getByRole("dialog", { name: "Invite someone" }).getByLabel("Role").selectOption("admin");
+		await expect(page.getByText("Projects they can see")).toHaveCount(0);
+	});
 
 	test("admins can be deactivated but not deleted", async ({ page }) => {
 		await installApi(page, "admin");

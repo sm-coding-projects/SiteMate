@@ -281,6 +281,8 @@ export interface TeamMember {
 	lastSignInAt: number | null;
 	/** Access removed by an admin (banned in Clerk): can't sign in until restored. */
 	accessRemoved: boolean;
+	/** Viewers: the projects they can see (empty until assigned). Always empty for admins. */
+	projectIds: string[];
 	createdAt: number;
 }
 
@@ -289,10 +291,14 @@ export interface TeamInvitation {
 	email: string;
 	role: Role;
 	status: string;
+	/** Viewers: the projects they'll see once they accept. */
+	projectIds: string[];
 	createdAt: number;
 }
 
 export interface Team {
+	/** Every project, for the access pickers. */
+	projects: { id: string; name: string; archived: boolean }[];
 	members: TeamMember[];
 	invitations: TeamInvitation[];
 }

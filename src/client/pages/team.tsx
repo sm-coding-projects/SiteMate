@@ -1,4 +1,4 @@
-import { EllipsisVertical, MailPlus, Trash2, UserCheck, UserX, X } from "lucide-react";
+import { EllipsisVertical, FolderKanban, MailPlus, Trash2, UserCheck, UserX, X } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { Navigate } from "react-router";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -30,13 +30,17 @@ import { useTeam, useTeamMutation } from "@/hooks/use-data";
 import { useMe } from "@/hooks/use-me";
 import { errorMessage } from "@/lib/api";
 import { formatDate, formatWhen } from "@/lib/format";
-import type { Role, TeamMember } from "../../shared/api-types";
+import type { Role, Team, TeamMember } from "../../shared/api-types";
 import { inviteCreate } from "../../shared/schemas";
 
 const ROLE_HELP: Record<Role, string> = {
 	admin: "Creates and edits projects, uploads, confirms quotes, manages the team.",
-	viewer: "Sees every project, photo, document and quote. Can't change anything.",
+	viewer:
+		"Sees only the projects you share with them: photos, documents, quotes and notes. Can't change anything.",
 };
+
+type ProjectOption = Team["projects"][number];
+const projectCount = (n: number) => (n === 0 ? "no projects yet" : n === 1 ? "1 project" : `${n} projects`);
 
 export function TeamPage() {
 	const { data: me, isPending } = useMe();
@@ -52,6 +56,8 @@ export function TeamPage() {
 	const [removing, setRemoving] = useState<TeamMember | null>(null);
 	const del = useTeamMutation((api, id: string) => api(`/admin/users/${id}`, { method: "DELETE" }));
 	const [deleting, setDeleting] = useState<TeamMember | null>(null);
+	const [sharing, setSharing] = useState<TeamMember | null>(null);
+	const projects = team.data?.projects ?? [];
 
 	if (isPending) return <Skeleton className="h-64" />;
 	if (me?.role !== "admin") return <Navigate to="/projects" replace />;
@@ -67,7 +73,8 @@ export function TeamPage() {
 					</Button>
 				}
 			/>
-			<InviteDialog open={inviting} onOpenChange={setInviting} />
+			<InviteDialog open={inviting} onOpenChange={setInviting} projects={projects} />
+			<ProjectsDialog member={sharing} onClose={() => setSharing(null)} projects={projects} />
 			<ConfirmDialog
 				open={removing !== null}
 				onOpenChange={(o) => !o && setRemoving(null)}
@@ -133,6 +140,7 @@ export function TeamPage() {
 									onRemove={() => setRemoving(m)}
 									onRestore={() => access.mutate({ id: m.id, remove: false })}
 									onDelete={() => setDeleting(m)}
+									onProjects={() => setSharing(m)}
 								/>
 							))}
 						</ul>
@@ -159,7 +167,9 @@ export function TeamPage() {
 										<span className="min-w-0 flex-1">
 											<span className="block truncate font-medium">{i.email}</span>
 											<span className="block text-sm text-muted-foreground">
-												{ROLE_LABEL[i.role]} · sent {formatDate(i.createdAt)}
+												{ROLE_LABEL[i.role]}
+												{i.role === "viewer" && ` · ${projectCount(i.projectIds.length)}`} · sent{" "}
+												{formatDate(i.createdAt)}
 											</span>
 										</span>
 										<Button
@@ -190,6 +200,7 @@ function MemberRow({
 	onRemove,
 	onRestore,
 	onDelete,
+	onProjects,
 }: {
 	member: TeamMember;
 	isMe: boolean;
@@ -198,6 +209,7 @@ function MemberRow({
 	onRemove: () => void;
 	onRestore: () => void;
 	onDelete: () => void;
+	onProjects: () => void;
 }) {
 	const removed = member.accessRemoved;
 	return (
@@ -221,6 +233,11 @@ function MemberRow({
 							? ` · last in ${formatWhen(member.lastSignInAt)}`
 							: " · not signed in yet"}
 				</span>
+				{member.role === "viewer" && !removed && (
+					<span className="block text-sm text-muted-foreground">
+						Sees {projectCount(member.projectIds.length)}
+					</span>
+				)}
 				{removed && (
 					<span className="mt-0.5 flex items-center gap-1 text-sm font-medium text-destructive">
 						<UserX className="size-4" aria-hidden /> Access removed
@@ -251,6 +268,11 @@ function MemberRow({
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent align="end" className="w-56">
+						{member.role === "viewer" && (
+							<DropdownMenuItem className="min-h-11" onSelect={onProjects}>
+								<FolderKanban aria-hidden /> Projects…
+							</DropdownMenuItem>
+						)}
 						{removed ? (
 							<DropdownMenuItem className="min-h-11" onSelect={onRestore}>
 								<UserCheck aria-hidden /> Restore access
@@ -276,21 +298,35 @@ function MemberRow({
 	);
 }
 
-function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+function InviteDialog({
+	open,
+	onOpenChange,
+	projects,
+}: {
+	open: boolean;
+	onOpenChange: (o: boolean) => void;
+	projects: ProjectOption[];
+}) {
 	const [email, setEmail] = useState("");
 	const [role, setRole] = useState<Role>("viewer");
+	const [projectIds, setProjectIds] = useState<string[]>([]);
 	const [error, setError] = useState<string | null>(null);
-	const invite = useTeamMutation((api, body: { email: string; role: Role }) =>
+	const invite = useTeamMutation((api, body: { email: string; role: Role; projectIds: string[] }) =>
 		api("/admin/invitations", { method: "POST", body: JSON.stringify(body) }),
 	);
 	const submit = (e: FormEvent) => {
 		e.preventDefault();
-		const parsed = inviteCreate.safeParse({ email: email.trim(), role });
+		const parsed = inviteCreate.safeParse({
+			email: email.trim(),
+			role,
+			projectIds: role === "viewer" ? projectIds : [],
+		});
 		if (!parsed.success) return setError(parsed.error.issues[0]?.message ?? "Check the email");
 		setError(null);
 		invite.mutate(parsed.data, {
 			onSuccess: () => {
 				setEmail("");
+				setProjectIds([]);
 				onOpenChange(false);
 			},
 			onError: (err) => setError(errorMessage(err)),
@@ -325,6 +361,9 @@ function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
 								<option value="admin">Admin</option>
 							</NativeSelect>
 						</Field>
+						{role === "viewer" && (
+							<ProjectPicker projects={projects} selected={projectIds} onChange={setProjectIds} />
+						)}
 					</DialogBody>
 					<DialogFooter>
 						<DialogClose asChild>
@@ -334,6 +373,111 @@ function InviteDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o:
 						</DialogClose>
 						<Button type="submit" disabled={invite.isPending}>
 							{invite.isPending ? "Sending…" : "Send invitation"}
+						</Button>
+					</DialogFooter>
+				</form>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+/** Checkbox list of projects. Archived ones stay listed (and labelled) so existing access can be seen and removed. */
+function ProjectPicker({
+	projects,
+	selected,
+	onChange,
+}: {
+	projects: ProjectOption[];
+	selected: string[];
+	onChange: (ids: string[]) => void;
+}) {
+	const toggle = (id: string) =>
+		onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+	return (
+		<fieldset className="grid gap-2">
+			<legend className="mb-2 text-sm font-medium">Projects they can see</legend>
+			{projects.length === 0 ? (
+				<p className="text-sm text-muted-foreground">No projects yet. You can share one later from Team.</p>
+			) : (
+				<ul className="max-h-64 divide-y overflow-y-auto rounded-md border">
+					{projects.map((p) => (
+						<li key={p.id}>
+							<label className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-ring">
+								<input
+									type="checkbox"
+									className="size-4 shrink-0 accent-foreground"
+									checked={selected.includes(p.id)}
+									onChange={() => toggle(p.id)}
+								/>
+								<span className="min-w-0 flex-1 truncate">{p.name}</span>
+								{p.archived && <span className="label-mono text-muted-foreground">Archived</span>}
+							</label>
+						</li>
+					))}
+				</ul>
+			)}
+			<p className="text-sm text-muted-foreground">
+				{selected.length === 0
+					? "They'll see nothing until you share a project."
+					: `They'll see ${projectCount(selected.length)} and nothing else.`}
+			</p>
+		</fieldset>
+	);
+}
+
+function ProjectsDialog({
+	member,
+	onClose,
+	projects,
+}: {
+	member: TeamMember | null;
+	onClose: () => void;
+	projects: ProjectOption[];
+}) {
+	const [selected, setSelected] = useState<string[]>([]);
+	const [shownFor, setShownFor] = useState<string | null>(null);
+	// Reset the ticks each time the dialog opens for someone.
+	if (member && shownFor !== member.id) {
+		setShownFor(member.id);
+		setSelected(member.projectIds);
+	}
+	const save = useTeamMutation((api, { id, projectIds }: { id: string; projectIds: string[] }) =>
+		api(`/admin/users/${id}/projects`, { method: "PUT", body: JSON.stringify({ projectIds }) }),
+	);
+	const close = () => {
+		setShownFor(null);
+		save.reset();
+		onClose();
+	};
+	const who = member?.name ?? member?.email ?? "";
+	return (
+		<Dialog open={member !== null} onOpenChange={(o) => !o && close()}>
+			<DialogContent>
+				<form
+					className="flex min-h-0 flex-1 flex-col"
+					onSubmit={(e) => {
+						e.preventDefault();
+						if (member) save.mutate({ id: member.id, projectIds: selected }, { onSuccess: close });
+					}}
+				>
+					<DialogHeader>
+						<DialogTitle>Projects for {who}</DialogTitle>
+						<DialogDescription>
+							Viewers only see the projects ticked here. Changes apply the next time their page loads.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogBody className="grid gap-4">
+						<ProjectPicker projects={projects} selected={selected} onChange={setSelected} />
+						{save.isError && <p className="text-sm text-destructive">{errorMessage(save.error)}</p>}
+					</DialogBody>
+					<DialogFooter>
+						<DialogClose asChild>
+							<Button type="button" variant="outline">
+								Cancel
+							</Button>
+						</DialogClose>
+						<Button type="submit" disabled={save.isPending}>
+							{save.isPending ? "Saving…" : "Save"}
 						</Button>
 					</DialogFooter>
 				</form>

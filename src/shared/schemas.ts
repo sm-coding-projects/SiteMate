@@ -303,10 +303,14 @@ export const quoteStatusUpdate = z.object({ status: z.enum(QUOTE_STATUSES) });
 
 // ── Team & preferences ───────────────────────────────────────────────────────
 
+const projectIds = z.array(idSchema).max(200);
 export const inviteCreate = z.object({
 	email: z.email("Enter a valid email").max(254),
 	role: z.enum(ROLE_VALUES),
+	/** Viewers only: the projects they'll see. Ignored for admins, who see everything. */
+	projectIds: projectIds.default([]),
 });
+export const projectAccessUpdate = z.object({ projectIds });
 export const roleUpdate = z.object({ role: z.enum(ROLE_VALUES) });
 export const preferencesUpdate = z.object({ emailNotifications: z.boolean() });
 

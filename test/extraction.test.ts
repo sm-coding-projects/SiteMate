@@ -105,7 +105,7 @@ describe("AI extraction pipeline", () => {
 		await consume({ type: "extract", extractionId }, testEnv);
 		expect(ai.calls).toEqual(["toMarkdown", "classify", "extract"]);
 
-		const ex = await api<ExtractionDetail>(`/extractions/${extractionId}`, { as: VIEWER });
+		const ex = await api<ExtractionDetail>(`/extractions/${extractionId}`, { as: ADMIN });
 		expect(ex.body.status).toBe("needs_review");
 		expect(ex.body.provider).toBe("workers-ai");
 		expect(ex.body.confidence).toBe(93);

@@ -43,6 +43,13 @@
       "when": 1791023591506,
       "tag": "0005_user_access",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791024770083,
+      "tag": "0006_project_access",
+      "breakpoints": true
     }
   ]
 }
