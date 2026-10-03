@@ -14,8 +14,8 @@
 		{
 			"binding": "DB",
 			"database_name": "sitemate-db",
-			// Replace with the id printed by `wrangler d1 create sitemate-db --location oc`
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			// Created with `wrangler d1 create sitemate-db --location oc`
+			"database_id": "c72e69a0-17a1-4c9c-8d47-3d23ddb336c2",
 			"migrations_dir": "migrations"
 		}
 	],
