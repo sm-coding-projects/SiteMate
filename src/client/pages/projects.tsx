@@ -1,22 +1,18 @@
 import { Plus, Search } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
-import { StageBar } from "@/components/brand/stage-bar";
 import { StageRail } from "@/components/brand/stage-rail";
 import { PageHeader } from "@/components/page-header";
 import { ProjectCard } from "@/components/project-card";
 import { ProjectFormDialog } from "@/components/project-form-dialog";
 import { LoadMore, QueryError } from "@/components/query-state";
-import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useProjects } from "@/hooks/use-data";
 import { useMe } from "@/hooks/use-me";
-import { BUILD_STAGES, stageNo, TEMPLATE_ITEM_COUNT, TEMPLATE_NAME } from "@/lib/build-stages";
+import { BUILD_STAGES, TEMPLATE_ITEM_COUNT, TEMPLATE_NAME } from "@/lib/build-stages";
 import { cn } from "@/lib/utils";
-
-const SAMPLE_STAGE = 4; // Frame
 
 const FILTERS = [
 	{ value: "open", label: "Open" },
@@ -159,7 +155,7 @@ export function ProjectsPage() {
 	);
 }
 
-/** First run: show what a project looks like, with the template's stages alongside. */
+/** First run: no projects yet, with the template's stages alongside. */
 function EmptyProjects({ isAdmin, onCreate }: { isAdmin: boolean; onCreate: () => void }) {
 	return (
 		<div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem] lg:gap-12">
@@ -170,10 +166,9 @@ function EmptyProjects({ isAdmin, onCreate }: { isAdmin: boolean; onCreate: () =
 					</h2>
 					<p className="mt-1 max-w-[60ch] text-muted-foreground">
 						{isAdmin
-							? "Create the first one and it'll look like this as the build moves along."
-							: "Once an admin creates a project it'll appear here, like this."}
+							? "Create the first one to start tracking photos, checklists and notes as the build moves along."
+							: "Once an admin creates a project it'll appear here."}
 					</p>
-					<SampleProjectCard className="mt-6" />
 					{isAdmin && (
 						<Button variant="outline" className="mt-6" onClick={onCreate}>
 							<Plus aria-hidden /> Create the first project
@@ -203,71 +198,9 @@ function EmptyProjects({ isAdmin, onCreate }: { isAdmin: boolean; onCreate: () =
 				<h2 id="stages-h" className="label-mono text-muted-foreground">
 					How every build is tracked
 				</h2>
-				<StageRail current={SAMPLE_STAGE} className="mt-5" />
-				<p className="mt-5 text-sm text-muted-foreground">Shown at stage {SAMPLE_STAGE}, like the example.</p>
+				<StageRail current={0} className="mt-5" />
 			</aside>
 		</div>
-	);
-}
-
-/** Registration ticks at the corners — the crop marks on a drawing sheet. */
-function RegistrationTicks() {
-	const tick = "absolute size-2.5 border-foreground/50";
-	return (
-		<span aria-hidden className="pointer-events-none">
-			<span className={cn(tick, "-top-px -left-px border-t border-l")} />
-			<span className={cn(tick, "-top-px -right-px border-t border-r")} />
-			<span className={cn(tick, "-bottom-px -left-px border-b border-l")} />
-			<span className={cn(tick, "-right-px -bottom-px border-r border-b")} />
-		</span>
-	);
-}
-
-/** A ghost of a filled-in project, so the empty screen shows what the product does. */
-function SampleProjectCard({ className }: { className?: string }) {
-	const stage = BUILD_STAGES[SAMPLE_STAGE - 1];
-	return (
-		<figure className={cn("relative rounded-md border bg-card", className)}>
-			<RegistrationTicks />
-			<div className="pointer-events-none p-6 select-none" aria-hidden>
-				<div className="flex flex-wrap items-start justify-between gap-3">
-					<div className="min-w-0">
-						<p className="font-heading text-lg font-semibold stretch-semi">14 Banksia Street, Marsden Park</p>
-						<p className="text-sm text-muted-foreground">Nguyen family · Single‑storey, 4 bed</p>
-					</div>
-					<StatusBadge status="in_progress" />
-				</div>
-
-				<div className="mt-6">
-					<div className="flex items-baseline justify-between gap-4">
-						<span className="label-mono">
-							<span className="text-muted-foreground">STAGE {stageNo(SAMPLE_STAGE)} · </span>
-							{stage?.code}
-						</span>
-						<span className="label-mono text-muted-foreground">11/{TEMPLATE_ITEM_COUNT}</span>
-					</div>
-					<StageBar current={SAMPLE_STAGE} className="mt-2" />
-				</div>
-
-				<div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-3">
-					<div className="flex gap-1.5">
-						{[0, 1, 2, 3].map((i) => (
-							<span key={i} className="bg-hatch relative size-12 rounded-[3px] border text-muted-foreground">
-								<span className="label-mono absolute right-1 bottom-0.5 text-[0.625rem] leading-none">
-									IMG
-								</span>
-							</span>
-						))}
-					</div>
-					<span className="text-sm whitespace-nowrap text-muted-foreground">
-						<span className="tabular">24</span> photos · 2h ago
-					</span>
-				</div>
-			</div>
-			<figcaption className="border-t px-6 py-3 label-mono text-muted-foreground">
-				Example — not real data
-			</figcaption>
-		</figure>
 	);
 }
 
