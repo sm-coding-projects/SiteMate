@@ -1,0 +1,9 @@
+# Copy to .prod.vars (never commit). Production overrides for `scripts/deploy.sh` / `node scripts/secrets.mjs`.
+# Clerk keys are read only from here (the production instance); every other secret falls back to .dev.vars,
+# so add one here only when production needs a different value.
+
+# ── Clerk (production instance) — Dashboard → Production → Configure → API keys ──
+CLERK_SECRET_KEY=sk_live_xxx
+CLERK_PUBLISHABLE_KEY=pk_live_xxx
+# Optional: the production instance's JWT public key, on one line with \n for line breaks.
+# CLERK_JWT_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"

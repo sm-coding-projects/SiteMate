@@ -1,5 +1,6 @@
 # Copy to .dev.vars for local dev (never commit). For production, `node scripts/secrets.mjs push <origin>`
-# uploads these as Worker secrets (AUTHORIZED_PARTIES is replaced by the production origin).
+# uploads these as Worker secrets, with .prod.vars on top (the Clerk keys come only from .prod.vars;
+# AUTHORIZED_PARTIES is replaced by the production origin).
 # Plain settings (APP_URL, AI_PROVIDER, EMAIL_MODE, …) live in wrangler.jsonc "vars"; any of them can be
 # overridden locally by adding them here.
 
