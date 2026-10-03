@@ -12,9 +12,18 @@ import { ApiRequestError } from "@/lib/api";
 import { AccountPage } from "@/pages/account";
 import { ActivityPage } from "@/pages/activity";
 import { LandingPage } from "@/pages/landing";
+import { ProjectActivityTab } from "@/pages/project/activity";
+import { DocumentsTab } from "@/pages/project/documents";
+import { ProjectLayout } from "@/pages/project/layout";
+import { NotesTab } from "@/pages/project/notes";
+import { PhotosTab } from "@/pages/project/photos";
+import { QuotesTab } from "@/pages/project/quotes";
+import { StagesTab } from "@/pages/project/stages";
 import { ProjectsPage } from "@/pages/projects";
+import { ReviewInboxPage, ReviewPage } from "@/pages/review";
 import { SetupRequired } from "@/pages/setup-required";
 import { SignInPage } from "@/pages/sign-in";
+import { TeamPage } from "@/pages/team";
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
@@ -32,6 +41,7 @@ const queryClient = new QueryClient({
 const router = createBrowserRouter([
 	{ path: "/", element: <LandingPage />, errorElement: <RouteError /> },
 	{ path: "/sign-in/*", element: <SignInPage />, errorElement: <RouteError /> },
+	{ path: "/sign-up/*", element: <SignInPage mode="sign-up" />, errorElement: <RouteError /> },
 	{
 		element: <RequireAuth />,
 		errorElement: <RouteError />,
@@ -41,7 +51,23 @@ const router = createBrowserRouter([
 				errorElement: <RouteError />,
 				children: [
 					{ path: "projects", element: <ProjectsPage /> },
+					{
+						path: "projects/:id",
+						element: <ProjectLayout />,
+						errorElement: <RouteError />,
+						children: [
+							{ index: true, element: <StagesTab />, errorElement: <RouteError /> },
+							{ path: "photos", element: <PhotosTab />, errorElement: <RouteError /> },
+							{ path: "documents", element: <DocumentsTab />, errorElement: <RouteError /> },
+							{ path: "quotes", element: <QuotesTab />, errorElement: <RouteError /> },
+							{ path: "notes", element: <NotesTab />, errorElement: <RouteError /> },
+							{ path: "activity", element: <ProjectActivityTab />, errorElement: <RouteError /> },
+						],
+					},
+					{ path: "review", element: <ReviewInboxPage />, errorElement: <RouteError /> },
+					{ path: "review/:id", element: <ReviewPage />, errorElement: <RouteError /> },
 					{ path: "activity", element: <ActivityPage /> },
+					{ path: "team", element: <TeamPage />, errorElement: <RouteError /> },
 					{ path: "account", element: <AccountPage /> },
 					{ path: "*", element: <Navigate to="/projects" replace /> },
 				],
@@ -67,6 +93,7 @@ createRoot(root).render(
 			<ClerkProvider
 				publishableKey={publishableKey}
 				signInUrl="/sign-in"
+				signUpUrl="/sign-up"
 				afterSignOutUrl="/"
 				localization={{
 					signIn: {

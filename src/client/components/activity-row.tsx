@@ -1,13 +1,38 @@
-import { Camera, CircleCheck, FileText, type LucideIcon, MessageSquareText } from "lucide-react";
+import {
+	Camera,
+	CircleCheck,
+	FileText,
+	Flag,
+	FolderPlus,
+	type LucideIcon,
+	MessageSquareText,
+	Receipt,
+	ScanText,
+	UserPlus,
+} from "lucide-react";
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
-export type ActivityKind = "photo" | "check" | "file" | "note";
+export type ActivityKind =
+	| "photo"
+	| "check"
+	| "file"
+	| "note"
+	| "project"
+	| "stage"
+	| "quote"
+	| "extraction"
+	| "team";
 const ICON: Record<ActivityKind, LucideIcon> = {
 	photo: Camera,
 	check: CircleCheck,
 	file: FileText,
 	note: MessageSquareText,
+	project: FolderPlus,
+	stage: Flag,
+	quote: Receipt,
+	extraction: ScanText,
+	team: UserPlus,
 };
 
 export interface ActivityItem {
@@ -79,7 +104,7 @@ export function ActivityRow({
 					{item.stage}
 				</span>
 				<span className="font-medium">{item.who}</span> {item.what}
-				<span className="block text-muted-foreground">{item.where}</span>
+				{item.where && <span className="block text-muted-foreground">{item.where}</span>}
 			</p>
 			<span className="label-mono pt-0.5 text-right text-muted-foreground">{item.when}</span>
 		</li>

@@ -19,12 +19,46 @@
 			"migrations_dir": "migrations"
 		}
 	],
-	"r2_buckets": [{ "binding": "FILES", "bucket_name": "sitemate-files" }],
+	"r2_buckets": [
+		{
+			"binding": "FILES",
+			"bucket_name": "sitemate-files",
+			// Browsers upload straight to the real bucket with presigned URLs, so `pnpm dev` must read the same
+			// bucket. Ignored by `wrangler deploy` and by tests (which use a local bucket).
+			"remote": true
+		}
+	],
 	"queues": {
 		"producers": [{ "binding": "JOBS", "queue": "sitemate-jobs" }],
-		"consumers": [{ "queue": "sitemate-jobs", "max_batch_size": 10, "max_batch_timeout": 5 }]
+		"consumers": [
+			{
+				"queue": "sitemate-jobs",
+				"max_batch_size": 5,
+				"max_batch_timeout": 5,
+				// Extraction and email jobs retry with backoff, then the consumer marks them failed.
+				"max_retries": 3
+			}
+		]
 	},
+	// Workers AI (free 10k neurons/day). Always runs remotely, also in `pnpm dev`.
+	"ai": { "binding": "AI", "remote": true },
 	"vars": {
-		"APP_ENV": "production"
+		"APP_ENV": "production",
+		// Public origin, used in email links. Also add it to AUTHORIZED_PARTIES (secret).
+		"APP_URL": "https://sitemate.example.workers.dev",
+		"R2_BUCKET": "sitemate-files",
+		// workers-ai | anthropic | openai-compatible. Falls back to workers-ai when the chosen provider has no key.
+		"AI_PROVIDER": "workers-ai",
+		// AI Gateway (Dashboard → AI → AI Gateway). Every provider call is routed through it.
+		"AI_GATEWAY_ID": "sitemate",
+		"WORKERS_AI_MODEL": "@cf/meta/llama-4-scout-17b-16e-instruct",
+		"ANTHROPIC_MODEL": "claude-opus-5-5",
+		"OPENAI_COMPAT_MODEL": "openai/gpt-5-mini",
+		// sandbox: every email goes to EMAIL_SANDBOX_TO (secret) with the intended recipient in the subject.
+		// live: needs a verified Resend domain and an EMAIL_FROM on it.
+		"EMAIL_MODE": "sandbox",
+		"EMAIL_FROM": "SiteMate <onboarding@resend.dev>",
+		// Resend free tier allows 100/day; keep headroom.
+		"EMAIL_DAILY_LIMIT": "90"
 	}
 }

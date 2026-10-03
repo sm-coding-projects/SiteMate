@@ -1,14 +1,38 @@
-# Copy to .dev.vars for local dev (never commit). For production, set secrets with
-# `wrangler secret put <NAME>` and vars in wrangler.jsonc.
+# Copy to .dev.vars for local dev (never commit). For production, `node scripts/secrets.mjs push <origin>`
+# uploads these as Worker secrets (AUTHORIZED_PARTIES is replaced by the production origin).
+# Plain settings (APP_URL, AI_PROVIDER, EMAIL_MODE, …) live in wrangler.jsonc "vars"; any of them can be
+# overridden locally by adding them here.
 
-# Clerk (development instance) — Dashboard → API keys
+APP_ENV=development
+APP_URL=http://localhost:5173
+
+# ── Clerk (development instance) — Dashboard → Configure → API keys ─────────
 CLERK_SECRET_KEY=sk_test_xxx
 CLERK_PUBLISHABLE_KEY=pk_test_xxx
-# Optional: PEM public key (Dashboard → API keys → JWT public key). Lets the Worker
-# verify sessions without fetching JWKS from Clerk on cold start.
+# Optional: PEM public key (API keys → JWT public key). Lets the Worker verify sessions without
+# fetching JWKS from Clerk on cold start.
 # CLERK_JWT_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
-
 # Comma-separated origins allowed to send Clerk session tokens (CSRF protection).
 AUTHORIZED_PARTIES=http://localhost:5173
 
-APP_ENV=development
+# ── R2 S3 API token (presigned upload/download URLs) ─────────────────────────
+# Dashboard → R2 Object Storage → Manage API tokens → Create Account API token
+# (Object Read & Write, applied to sitemate-files only). Account ID is on the R2 overview page.
+R2_ACCOUNT_ID=xxx
+R2_ACCESS_KEY_ID=xxx
+R2_SECRET_ACCESS_KEY=xxx
+
+# ── Email (Resend) — resend.com → API Keys ───────────────────────────────────
+RESEND_API_KEY=re_xxx
+# Sandbox mode (default) sends every email here instead. Must be your Resend account's own address.
+EMAIL_SANDBOX_TO=you@example.com
+
+# ── Optional AI providers (Workers AI is the free default and needs no key) ──
+# Used when AI_PROVIDER=anthropic in wrangler.jsonc.
+# ANTHROPIC_API_KEY=sk-ant-xxx
+# Used when AI_PROVIDER=openai-compatible. Leave OPENAI_COMPAT_BASE_URL unset to route through AI Gateway's
+# OpenAI-compatible endpoint (model names like "openai/gpt-5-mini"), or set any OpenAI-compatible base URL.
+# OPENAI_COMPAT_API_KEY=xxx
+# OPENAI_COMPAT_BASE_URL=https://openrouter.ai/api/v1
+# Only if the AI Gateway has "Authenticated Gateway" turned on.
+# AI_GATEWAY_TOKEN=xxx

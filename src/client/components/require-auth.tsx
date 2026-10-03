@@ -14,7 +14,7 @@ export function RequireAuth() {
 /** Shown while Clerk loads, so the first paint on slow 4G has the shell's shape. */
 function ShellSkeleton() {
 	return (
-		<div className="min-h-dvh md:grid md:grid-cols-[14rem_1fr]" role="status" aria-busy="true">
+		<div className="min-h-dvh md:grid md:grid-cols-[14rem_minmax(0,1fr)]" role="status" aria-busy="true">
 			<span className="sr-only">Loading</span>
 			<div className="hidden border-r bg-sidebar p-4 md:block">
 				<Skeleton className="mb-6 h-8 w-32" />

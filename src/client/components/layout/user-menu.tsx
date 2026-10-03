@@ -1,5 +1,5 @@
 import { useClerk, useUser } from "@clerk/react";
-import { EllipsisVertical, LogOut, Monitor, Moon, Sun, UserRound } from "lucide-react";
+import { EllipsisVertical, LogOut, Monitor, Moon, Sun, UserRound, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link, NavLink } from "react-router";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -127,6 +127,13 @@ function UserMenu({ trigger, side }: { trigger: ReactNode; side: "top" | "bottom
 						<UserRound aria-hidden /> Account
 					</Link>
 				</DropdownMenuItem>
+				{role === "admin" && (
+					<DropdownMenuItem asChild className="min-h-11">
+						<Link to="/team">
+							<UsersRound aria-hidden /> Team
+						</Link>
+					</DropdownMenuItem>
+				)}
 				<DropdownMenuSeparator />
 				<DropdownMenuLabel className="text-xs font-medium text-muted-foreground">Theme</DropdownMenuLabel>
 				<DropdownMenuRadioGroup value={theme} onValueChange={(v) => setTheme(v as ThemePref)}>
