@@ -20,6 +20,7 @@ import type {
 	TemplateSummary,
 } from "../../shared/api-types";
 import { idParam, projectCreate, projectListQuery, projectUpdate } from "../../shared/schemas";
+import { visibleProjects } from "../lib/access";
 import { logActivity } from "../lib/activity";
 import { chunkRows } from "../lib/batch";
 import { decodeCursor, page } from "../lib/cursor";
@@ -56,6 +57,8 @@ export const projectRoutes = new Hono<AppEnv>()
 		const { status, q, cursor, limit } = c.req.valid("query");
 
 		const where: SQL[] = [];
+		const visible = visibleProjects(c.get("user"));
+		if (visible) where.push(visible);
 		if (status === "open") where.push(sql`${projects.status} != 'archived'`);
 		else if (status !== "all") where.push(eq(projects.status, status));
 		if (q) {

@@ -16,6 +16,7 @@ import {
 	MAX_THUMB_BYTES,
 	uploadUrlsBody,
 } from "../../shared/schemas";
+import { assertProjectAccess } from "../lib/access";
 import { logActivity, touchProject } from "../lib/activity";
 import { decodeCursor, page } from "../lib/cursor";
 import { fileKeys, presignGet, presignPut, r2Configured, signThumbUrls, UPLOAD_URL_TTL_S } from "../lib/r2";
@@ -261,13 +262,14 @@ export const fileRoutes = new Hono<AppEnv>()
 		return c.json({ id, status: "uploaded", extractionId });
 	})
 
-	// Short-lived download link after the permission check (any signed-in user may view).
+	// Short-lived download link after the permission check (admins, and viewers of this project).
 	.get("/:id/url", zv("param", idParam), zv("query", fileUrlQuery), async (c) => {
 		requireR2(c.env);
 		const db = c.get("db");
 		const { id } = c.req.valid("param");
 		const { download } = c.req.valid("query");
 		const f = await loadFile(db, id);
+		await assertProjectAccess(c, f.projectId);
 		if (f.uploadStatus !== "uploaded") throw notFound("File is still uploading");
 		return c.json(await presignGet(c.env, f.r2Key, { filename: f.filename, inline: download !== "1" }));
 	})

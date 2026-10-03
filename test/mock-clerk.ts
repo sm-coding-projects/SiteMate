@@ -6,7 +6,13 @@ import { vi } from "vitest";
 
 export const fakeClerk = {
 	users: {
-		getUser: vi.fn(),
+		// Overridden per test with mockResolvedValueOnce; the default is a user with no metadata.
+		getUser: vi.fn(async (id: string) => ({
+			id,
+			publicMetadata: {} as Record<string, unknown>,
+			primaryEmailAddress: null as { emailAddress: string } | null,
+			emailAddresses: [] as { emailAddress: string }[],
+		})),
 		getUserList: vi.fn(async () => ({ data: [], totalCount: 0 })),
 		updateUserMetadata: vi.fn(async (id: string, params: unknown) => ({ id, ...(params as object) })),
 		deleteUser: vi.fn(async (id: string) => ({ id, deleted: true })),

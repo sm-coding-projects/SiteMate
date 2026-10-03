@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
-import { AppShell } from "@/components/layout/app-shell";
+import { AdminOnly, AppShell } from "@/components/layout/app-shell";
 import { RequireAuth } from "@/components/require-auth";
 import { RouteError } from "@/components/route-error";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -65,10 +65,15 @@ const router = createBrowserRouter([
 							{ path: "activity", element: <ProjectActivityTab />, errorElement: <RouteError /> },
 						],
 					},
-					{ path: "review", element: <ReviewInboxPage />, errorElement: <RouteError /> },
-					{ path: "review/:id", element: <ReviewPage />, errorElement: <RouteError /> },
-					{ path: "activity", element: <ActivityPage /> },
-					{ path: "team", element: <TeamPage />, errorElement: <RouteError /> },
+					{
+						element: <AdminOnly />,
+						children: [
+							{ path: "review", element: <ReviewInboxPage />, errorElement: <RouteError /> },
+							{ path: "review/:id", element: <ReviewPage />, errorElement: <RouteError /> },
+							{ path: "activity", element: <ActivityPage /> },
+							{ path: "team", element: <TeamPage />, errorElement: <RouteError /> },
+						],
+					},
 					{ path: "account", element: <AccountPage /> },
 					{ path: "*", element: <Navigate to="/projects" replace /> },
 				],

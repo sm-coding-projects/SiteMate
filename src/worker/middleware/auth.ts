@@ -1,8 +1,8 @@
 import { clerkMiddleware, getAuth } from "@clerk/hono";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { createMiddleware } from "hono/factory";
 import { HTTPException } from "hono/http-exception";
-import { ROLES, users } from "../../db/schema";
+import { projectAccess, projects, ROLES, users } from "../../db/schema";
 import type { Me, Role } from "../../shared/api-types";
 import type { AppEnv } from "../types";
 
@@ -50,16 +50,19 @@ export const requireUser = () =>
 		// Clerk ends a removed user's sessions, but a token already issued stays valid for up to a minute.
 		if (existing?.accessRevokedAt) throw new HTTPException(403, { message: "Your access has been removed" });
 
-		// Session token not customised yet: fall back to the Clerk API, but only when
-		// we have nothing stored for this user.
-		if (!profile && !existing) {
+		// First request from this user: the session token may not be customised yet, and a new viewer's
+		// projects (copied from their invitation) only live in Clerk's publicMetadata. One Clerk call, once.
+		let invitedProjectIds: string[] = [];
+		if (!existing && (!profile || profile.role === "viewer")) {
 			const u = await c.get("clerk").users.getUser(auth.userId);
 			const email = u.primaryEmailAddress?.emailAddress ?? u.emailAddresses[0]?.emailAddress ?? "";
-			profile = {
+			profile ??= {
 				email,
 				name: [u.firstName, u.lastName].filter(Boolean).join(" ") || null,
 				role: toRole(u.publicMetadata.role),
 			};
+			const ids = u.publicMetadata.projectIds;
+			if (Array.isArray(ids)) invitedProjectIds = ids.filter((x): x is string => typeof x === "string");
 		}
 
 		let me: Me;
@@ -78,6 +81,12 @@ export const requireUser = () =>
 				.values({ id: auth.userId, ...profile, createdAt: now, updatedAt: now })
 				.onConflictDoUpdate({ target: users.id, set: { ...profile, updatedAt: now } });
 			me = { id: auth.userId, ...profile };
+			if (!existing && me.role === "viewer" && invitedProjectIds.length > 0) {
+				// Only projects that still exist (one may have been deleted since the invitation).
+				await db.run(sql`
+					insert or ignore into ${projectAccess} (project_id, user_id)
+					select id, ${me.id} from ${projects} where id in ${invitedProjectIds}`);
+			}
 		}
 
 		c.set("user", { id: me.id, email: me.email, name: me.name, role: me.role });

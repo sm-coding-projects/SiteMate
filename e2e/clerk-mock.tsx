@@ -1,6 +1,6 @@
 /**
  * Stand-in for @clerk/react in UI tests (aliased in vite.e2e.config.ts). Always signed in; the API
- * fixtures decide whether that user is an admin or a viewer.
+ * fixtures decide whether that user is an admin or a viewer (installApi sets window.__E2E_ROLE to match).
  */
 import type { ReactNode } from "react";
 
@@ -13,6 +13,7 @@ export const useUser = () => ({
 		hasImage: false,
 		imageUrl: "",
 		primaryEmailAddress: { emailAddress: "sam@example.com" },
+		publicMetadata: { role: (globalThis as { __E2E_ROLE?: string }).__E2E_ROLE ?? "admin" },
 	},
 });
 export const useClerk = () => ({ signOut: async () => {}, openUserProfile: () => {} });

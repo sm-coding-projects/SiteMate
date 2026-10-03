@@ -3,7 +3,8 @@ import { HTTPException } from "hono/http-exception";
 import type { JobMessage } from "../shared/api-types";
 import { createDb } from "./db";
 import { hostRedirect } from "./hosts";
-import { clerk, requireUser } from "./middleware/auth";
+import { requireProjectAccess } from "./lib/access";
+import { clerk, requireRole, requireUser } from "./middleware/auth";
 import { handleQueue } from "./queue";
 import { adminRoutes } from "./routes/admin";
 import { aiSettingsRoutes } from "./routes/ai-settings";
@@ -27,6 +28,13 @@ app.get("/health", (c) => c.json({ ok: true, env: c.env.APP_ENV, time: Date.now(
 
 // Everything below requires a signed-in user.
 app.use(clerk(), requireUser());
+// Viewers see only their assigned projects (lib/access.ts) and none of the workspace-wide pages.
+app.use("/projects/:id", requireProjectAccess());
+app.use("/projects/:id/*", requireProjectAccess());
+for (const path of ["/activity", "/extractions", "/suppliers", "/templates"]) {
+	app.use(path, requireRole("admin"));
+	app.use(`${path}/*`, requireRole("admin"));
+}
 app.route("/me", meRoutes);
 app.route("/admin/ai", aiSettingsRoutes);
 app.route("/admin", adminRoutes);

@@ -13,6 +13,7 @@ import {
 	stageCreate,
 	stageUpdate,
 } from "../../shared/schemas";
+import { assertProjectAccess } from "../lib/access";
 import { logActivity, touchProject } from "../lib/activity";
 import { runBatch, type Statement } from "../lib/batch";
 import { badRequest, notFound, zv } from "../lib/validate";
@@ -352,7 +353,8 @@ export const stageRoutes = new Hono<AppEnv>()
 	.get("/:id/items", zv("param", idParam), async (c) => {
 		const db = c.get("db");
 		const { id } = c.req.valid("param");
-		await loadStage(db, id);
+		const stage = await loadStage(db, id);
+		await assertProjectAccess(c, stage.projectId);
 		const rows = await db
 			.select()
 			.from(projectItems)

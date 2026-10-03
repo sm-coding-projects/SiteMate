@@ -1,16 +1,30 @@
-import { NavLink, Outlet, useLocation } from "react-router";
+import { useUser } from "@clerk/react";
+import { Link, Navigate, NavLink, Outlet, useLocation } from "react-router";
 import { Wordmark } from "@/components/brand/wordmark";
 import { OfflineBanner } from "@/components/offline-banner";
 import { UploadTray } from "@/components/upload-tray";
-import { useIsAdmin } from "@/hooks/use-me";
 import { cn } from "@/lib/utils";
 import { ICON_PROPS, NAV } from "./nav";
 import { MobileUserMenu, SidebarUser } from "./user-menu";
 
-/** Desktop (≥768px): left sidebar. Mobile: top bar + bottom tab bar. */
+/**
+ * The role from Clerk's user object (loaded before any page renders, see RequireAuth), so the right shell paints
+ * first time. The API enforces the same rule from the session token.
+ */
+function useClerkIsAdmin() {
+	return useUser().user?.publicMetadata?.role === "admin";
+}
+
+/** Review, workspace Activity and Team: viewers go back to their projects. */
+export function AdminOnly() {
+	return useClerkIsAdmin() ? <Outlet /> : <Navigate to="/projects" replace />;
+}
+
+/** Desktop (≥768px): left sidebar. Mobile: top bar + bottom tab bar. Viewers get a plain top bar instead. */
 export function AppShell() {
 	const { pathname } = useLocation();
-	const isAdmin = useIsAdmin();
+	const isAdmin = useClerkIsAdmin();
+	if (!isAdmin) return <ViewerShell />;
 	const nav = NAV.filter((n) => !n.adminOnly || isAdmin);
 	const mobileNav = nav.filter((n) => n.mobile);
 	return (
@@ -105,6 +119,35 @@ export function AppShell() {
 					</NavLink>
 				))}
 			</nav>
+		</div>
+	);
+}
+
+/** Viewers only see the projects shared with them, so there's nothing to navigate between: logo + account menu. */
+function ViewerShell() {
+	const { pathname } = useLocation();
+	return (
+		<div className="flex min-h-dvh flex-col">
+			<a
+				href="#main"
+				className="sr-only z-50 rounded-md bg-card px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+			>
+				Skip to content
+			</a>
+			<header className="sticky top-0 z-30 border-b bg-sidebar/95 pt-[env(safe-area-inset-top)]">
+				<div className="mx-auto flex h-14 w-full max-w-[1200px] items-center justify-between px-4 md:h-16 md:px-10">
+					<Link to="/projects" aria-label="Your projects">
+						<Wordmark />
+					</Link>
+					<MobileUserMenu />
+				</div>
+			</header>
+			<OfflineBanner />
+			<main id="main" className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-6 md:px-10 md:py-10">
+				<div key={pathname} className="animate-page-in">
+					<Outlet />
+				</div>
+			</main>
 		</div>
 	);
 }

@@ -66,7 +66,7 @@ export function ProjectsPage() {
 				description={
 					isAdmin
 						? "Every build you're running, from pre‑construction to handover."
-						: "Every build in progress. You have view‑only access."
+						: "The builds shared with you. You have view‑only access."
 				}
 				actions={
 					isAdmin ? (
@@ -167,7 +167,7 @@ function EmptyProjects({ isAdmin, onCreate }: { isAdmin: boolean; onCreate: () =
 					<p className="mt-1 max-w-[60ch] text-muted-foreground">
 						{isAdmin
 							? "Create the first one to start tracking photos, checklists and notes as the build moves along."
-							: "Once an admin creates a project it'll appear here."}
+							: "Nothing has been shared with you yet. Your builder will add you to your project."}
 					</p>
 					{isAdmin && (
 						<Button variant="outline" className="mt-6" onClick={onCreate}>

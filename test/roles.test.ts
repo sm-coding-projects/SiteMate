@@ -67,7 +67,7 @@ describe("viewer role is read-only", () => {
 		expect(fakeClerk.invitations.createInvitation).not.toHaveBeenCalled();
 	});
 
-	it("can still read everything and change their own preferences", async () => {
+	it("can read their shared projects and change their own preferences", async () => {
 		const projectId = await createProject();
 		for (const path of [
 			"/projects",
@@ -76,12 +76,12 @@ describe("viewer role is read-only", () => {
 			`/projects/${projectId}/activity`,
 			`/projects/${projectId}/files?kind=photos`,
 			`/projects/${projectId}/quotes`,
-			"/activity",
-			"/extractions",
-			"/suppliers",
-			"/templates",
 		]) {
 			expect((await api(path, { as: VIEWER })).status, path).toBe(200);
+		}
+		// Workspace-wide pages are admin-only (see access.test.ts for unshared projects).
+		for (const path of ["/activity", "/extractions", "/suppliers", "/templates"]) {
+			expect((await api(path, { as: VIEWER })).status, path).toBe(403);
 		}
 		const pref = await api<{ emailNotifications: boolean }>("/me/preferences", {
 			as: VIEWER,
@@ -112,7 +112,7 @@ describe("team management (admin)", () => {
 		expect(fakeClerk.invitations.createInvitation).toHaveBeenCalledWith(
 			expect.objectContaining({
 				emailAddress: "new.viewer@example.com",
-				publicMetadata: { role: "viewer" },
+				publicMetadata: { role: "viewer", projectIds: [] },
 				redirectUrl: "http://localhost:5173/sign-up",
 			}),
 		);
