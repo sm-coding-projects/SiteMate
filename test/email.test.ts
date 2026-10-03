@@ -43,7 +43,10 @@ beforeEach(async () => {
 describe("notification email", () => {
 	it("sandbox mode redirects every email to EMAIL_SANDBOX_TO with the intended recipient in the subject", async () => {
 		const { projectId, stageId } = await completedStage();
-		await consume({ type: "notify", kind: "stage_completed", projectId, stageId, actorId: ADMIN.id }, emailEnv());
+		await consume(
+			{ type: "notify", kind: "stage_completed", projectId, stageId, actorId: ADMIN.id },
+			emailEnv(),
+		);
 		expect(send).toHaveBeenCalledTimes(1); // the actor isn't emailed about their own change
 		const [payload, opts] = send.mock.calls[0] ?? [];
 		expect(payload?.to).toBe("owner@example.com");
@@ -66,7 +69,10 @@ describe("notification email", () => {
 	it("respects the per-user opt-out", async () => {
 		const { projectId, stageId } = await completedStage();
 		await api("/me/preferences", { as: VIEWER, method: "PATCH", body: { emailNotifications: false } });
-		await consume({ type: "notify", kind: "stage_completed", projectId, stageId, actorId: ADMIN.id }, emailEnv());
+		await consume(
+			{ type: "notify", kind: "stage_completed", projectId, stageId, actorId: ADMIN.id },
+			emailEnv(),
+		);
 		expect(send).not.toHaveBeenCalled();
 		await api("/me/preferences", { as: VIEWER, method: "PATCH", body: { emailNotifications: true } });
 	});
@@ -84,7 +90,13 @@ describe("notification email", () => {
 
 	it("does not send twice when the queue retries the same event", async () => {
 		const { projectId, stageId } = await completedStage();
-		const msg: JobMessage = { type: "notify", kind: "stage_completed", projectId, stageId, actorId: ADMIN.id };
+		const msg: JobMessage = {
+			type: "notify",
+			kind: "stage_completed",
+			projectId,
+			stageId,
+			actorId: ADMIN.id,
+		};
 		await consume(msg, emailEnv());
 		await consume(msg, emailEnv());
 		expect(send).toHaveBeenCalledTimes(1);
@@ -109,13 +121,20 @@ describe("notification email", () => {
 	it("admin test email goes through the queue", async () => {
 		const res = await api<{ queued: boolean }>("/admin/test-email", { as: ADMIN, method: "POST" });
 		expect(res.status).toBe(202);
-		await consume({ type: "notify", kind: "test", to: ADMIN.email, requestedBy: ADMIN.id, at: Date.now() }, emailEnv());
+		await consume(
+			{ type: "notify", kind: "test", to: ADMIN.email, requestedBy: ADMIN.id, at: Date.now() },
+			emailEnv(),
+		);
 		expect(send.mock.calls[0]?.[0]?.subject).toBe("[to admin@example.com] SiteMate test email");
 	});
 
 	it("escapes content in the HTML body", () => {
 		const { html } = renderEmail(
-			{ heading: "<script>x</script>", lines: ["a & b"], cta: { label: "Go", url: "https://x.test/?a=1&b=2" } },
+			{
+				heading: "<script>x</script>",
+				lines: ["a & b"],
+				cta: { label: "Go", url: "https://x.test/?a=1&b=2" },
+			},
 			"footer",
 		);
 		expect(html).not.toContain("<script>");
