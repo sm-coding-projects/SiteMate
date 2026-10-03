@@ -23,6 +23,7 @@ import { ProjectsPage } from "@/pages/projects";
 import { ReviewInboxPage, ReviewPage } from "@/pages/review";
 import { SetupRequired } from "@/pages/setup-required";
 import { SignInPage } from "@/pages/sign-in";
+import { TeamPage } from "@/pages/team";
 
 const publishableKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined;
 
@@ -40,6 +41,7 @@ const queryClient = new QueryClient({
 const router = createBrowserRouter([
 	{ path: "/", element: <LandingPage />, errorElement: <RouteError /> },
 	{ path: "/sign-in/*", element: <SignInPage />, errorElement: <RouteError /> },
+	{ path: "/sign-up/*", element: <SignInPage mode="sign-up" />, errorElement: <RouteError /> },
 	{
 		element: <RequireAuth />,
 		errorElement: <RouteError />,
@@ -65,6 +67,7 @@ const router = createBrowserRouter([
 					{ path: "review", element: <ReviewInboxPage />, errorElement: <RouteError /> },
 					{ path: "review/:id", element: <ReviewPage />, errorElement: <RouteError /> },
 					{ path: "activity", element: <ActivityPage /> },
+					{ path: "team", element: <TeamPage />, errorElement: <RouteError /> },
 					{ path: "account", element: <AccountPage /> },
 					{ path: "*", element: <Navigate to="/projects" replace /> },
 				],
@@ -90,6 +93,7 @@ createRoot(root).render(
 			<ClerkProvider
 				publishableKey={publishableKey}
 				signInUrl="/sign-in"
+				signUpUrl="/sign-up"
 				afterSignOutUrl="/"
 				localization={{
 					signIn: {
