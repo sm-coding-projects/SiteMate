@@ -27,6 +27,35 @@ const STAGES = [
 const thumb = (hue: number) =>
 	`data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="480" height="360"><rect width="480" height="360" fill="hsl(${hue} 20% 55%)"/><path d="M40 300 L240 120 L440 300 Z" fill="none" stroke="white" stroke-width="6"/></svg>`)}`;
 
+/** Files already attached to checks (ids match the /files fixtures below). */
+const ATTACHMENTS: Record<string, unknown[]> = {
+	s3i2: [
+		{
+			fileId: "ph1",
+			filename: "IMG_1001.jpg",
+			category: "photo",
+			mimeType: "image/jpeg",
+			thumbUrl: thumb(30),
+		},
+		{
+			fileId: "ph2",
+			filename: "IMG_1002.jpg",
+			category: "photo",
+			mimeType: "image/jpeg",
+			thumbUrl: thumb(60),
+		},
+	],
+	s3i3: [
+		{
+			fileId: "f2",
+			filename: "Termite protection certificate.pdf",
+			category: "certificate",
+			mimeType: "application/pdf",
+			thumbUrl: null,
+		},
+	],
+};
+
 export function makeProject() {
 	return {
 		id: "p1",
@@ -58,6 +87,7 @@ export function makeProject() {
 				source: "template",
 				completedAt: i < 3 || (i === 3 && j < 2) ? NOW - (90 - i * 20) * DAY : null,
 				completedBy: i < 3 || (i === 3 && j < 2) ? { id: "u1", name: "Priya Patel" } : null,
+				attachments: ATTACHMENTS[`s${i + 1}i${j + 1}`] ?? [],
 			})),
 		})),
 	};

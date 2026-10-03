@@ -5,6 +5,7 @@ import {
 	CircleCheck,
 	EllipsisVertical,
 	GripVertical,
+	Paperclip,
 	Pencil,
 	Play,
 	Plus,
@@ -15,6 +16,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { RailNode, type RailState } from "@/components/brand/stage-rail";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { AttachFilesDialog, ItemAttachments } from "@/components/item-attachments";
 import { RenameDialog } from "@/components/rename-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -396,20 +398,23 @@ function Checklist({ stage }: { stage: ProjectStage }) {
 							key={item.id}
 							{...drag.rowProps(item.id)}
 							className={cn(
-								"flex items-center gap-1 pr-1",
 								drag.over === item.id && "shadow-[inset_0_2px_0_var(--foreground)]",
 								drag.dragging === item.id && "opacity-50",
 							)}
 						>
-							<ChecklistRow
-								item={item}
-								editable={isAdmin}
-								onToggle={(completed) => updateItem.mutate({ id: item.id, completed })}
-							/>
-							{isAdmin && fine && (
-								<GripVertical className="size-4 shrink-0 cursor-grab text-muted-foreground" aria-hidden />
-							)}
-							{isAdmin && <ItemMenu item={item} stage={stage} index={i} />}
+							<div className="flex items-center gap-1 pr-1">
+								<ChecklistRow
+									item={item}
+									editable={isAdmin}
+									onToggle={(completed) => updateItem.mutate({ id: item.id, completed })}
+								/>
+								{isAdmin && fine && (
+									<GripVertical className="size-4 shrink-0 cursor-grab text-muted-foreground" aria-hidden />
+								)}
+								{isAdmin && <ItemMenu item={item} stage={stage} index={i} />}
+							</div>
+							{/* Outside the row's <label>, so opening a file never ticks the box. Indented to the title. */}
+							<ItemAttachments attachments={item.attachments} className="pr-4 pb-3 pl-[3.25rem]" />
 						</li>
 					))}
 				</ul>
@@ -487,6 +492,7 @@ function ItemMenu({ item, stage, index }: { item: ProjectItem; stage: ProjectSta
 	const { project } = useProjectContext();
 	const { data: me } = useMe();
 	const [renaming, setRenaming] = useState(false);
+	const [attaching, setAttaching] = useState(false);
 	const update = useUpdateItem(project.id, me);
 	const remove = useDeleteItem(project.id);
 	const reorder = useReorder(project.id);
@@ -503,7 +509,10 @@ function ItemMenu({ item, stage, index }: { item: ProjectItem; stage: ProjectSta
 						<EllipsisVertical aria-hidden />
 					</Button>
 				</DropdownMenuTrigger>
-				<DropdownMenuContent align="end" className="w-52">
+				<DropdownMenuContent align="end" className="w-64">
+					<DropdownMenuItem className="min-h-11" onSelect={() => setAttaching(true)}>
+						<Paperclip aria-hidden /> Attach photos & documents
+					</DropdownMenuItem>
 					<DropdownMenuItem className="min-h-11" onSelect={() => setRenaming(true)}>
 						<Pencil aria-hidden /> Rename
 					</DropdownMenuItem>
@@ -527,6 +536,13 @@ function ItemMenu({ item, stage, index }: { item: ProjectItem; stage: ProjectSta
 				maxLength={160}
 				pending={update.isPending}
 				onSave={(title) => update.mutate({ id: item.id, title }, { onSuccess: () => setRenaming(false) })}
+			/>
+			<AttachFilesDialog
+				open={attaching}
+				onOpenChange={setAttaching}
+				projectId={project.id}
+				stage={stage}
+				item={item}
 			/>
 		</>
 	);

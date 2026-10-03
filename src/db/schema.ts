@@ -14,6 +14,7 @@ import {
 	type AnySQLiteColumn,
 	index,
 	integer,
+	primaryKey,
 	sqliteTable,
 	text,
 	uniqueIndex,
@@ -234,6 +235,24 @@ export const files = sqliteTable(
 		deletedAt: integer("deleted_at"),
 	},
 	(t) => [index("files_project_category_created_idx").on(t.projectId, t.category, t.createdAt)],
+);
+
+/** Project files attached to a checklist item as evidence (a file can back several items). */
+export const itemFiles = sqliteTable(
+	"item_files",
+	{
+		itemId: text("item_id")
+			.notNull()
+			.references(() => projectItems.id, { onDelete: "cascade" }),
+		fileId: text("file_id")
+			.notNull()
+			.references(() => files.id, { onDelete: "cascade" }),
+		attachedBy: text("attached_by")
+			.notNull()
+			.references(() => users.id),
+		createdAt: createdAt(),
+	},
+	(t) => [primaryKey({ columns: [t.itemId, t.fileId] }), index("item_files_file_idx").on(t.fileId)],
 );
 
 // ── Step 5: AI extraction & quotes ──────────────────────────────────────────

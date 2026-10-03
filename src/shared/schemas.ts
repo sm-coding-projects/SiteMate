@@ -125,6 +125,10 @@ export type ItemUpdate = z.input<typeof itemUpdate>;
 
 // ── Notes & activity ─────────────────────────────────────────────────────────
 
+/** The full set of files attached to an item (replaces the current set; [] detaches all). */
+export const itemFilesUpdate = z.object({ fileIds: z.array(idSchema).max(50, "Attach at most 50 files") });
+export type ItemFilesUpdate = z.infer<typeof itemFilesUpdate>;
+
 export const noteCreate = z.object({
 	body: z.string().trim().min(1, "Write something").max(5000),
 	stageId: idSchema.nullable().optional(),

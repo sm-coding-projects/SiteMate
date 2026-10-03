@@ -176,6 +176,12 @@ export const useAddItem = (projectId: string) =>
 		api(`/stages/${stageId}/items`, { method: "POST", ...json({ title }) }),
 	);
 
+/** Replaces the set of project files attached to a checklist item. */
+export const useSetItemFiles = (projectId: string) =>
+	useProjectMutation(projectId, (api, { id, fileIds }: { id: string; fileIds: string[] }) =>
+		api(`/items/${id}/files`, { method: "PUT", ...json({ fileIds }) }),
+	);
+
 export const useDeleteItem = (projectId: string) =>
 	useProjectMutation(projectId, (api, id: string) => api(`/items/${id}`, { method: "DELETE" }));
 

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { ulid } from "ulid";
 import {
 	files,
+	itemFiles,
 	projectItems,
 	projectStages,
 	projects,
@@ -11,7 +12,13 @@ import {
 	users,
 	workflowTemplates,
 } from "../../db/schema";
-import type { ProjectDetail, ProjectSummary, StageLite, TemplateSummary } from "../../shared/api-types";
+import type {
+	ItemAttachment,
+	ProjectDetail,
+	ProjectSummary,
+	StageLite,
+	TemplateSummary,
+} from "../../shared/api-types";
 import { idParam, projectCreate, projectListQuery, projectUpdate } from "../../shared/schemas";
 import { logActivity } from "../lib/activity";
 import { chunkRows } from "../lib/batch";
@@ -244,7 +251,7 @@ export const projectRoutes = new Hono<AppEnv>()
 		const project = await db.query.projects.findFirst({ where: eq(projects.id, id) });
 		if (!project) throw notFound("Project not found");
 
-		const [stages, items] = await db.batch([
+		const [stages, items, attached] = await db.batch([
 			db
 				.select()
 				.from(projectStages)
@@ -267,7 +274,37 @@ export const projectRoutes = new Hono<AppEnv>()
 				.leftJoin(users, eq(projectItems.completedBy, users.id))
 				.where(eq(projectStages.projectId, id))
 				.orderBy(asc(projectItems.position)),
+			// Attachments: only live, fully uploaded files.
+			db
+				.select({
+					itemId: itemFiles.itemId,
+					fileId: files.id,
+					filename: files.filename,
+					category: files.category,
+					mimeType: files.mimeType,
+					thumbKey: files.thumbKey,
+				})
+				.from(itemFiles)
+				.innerJoin(files, eq(itemFiles.fileId, files.id))
+				.where(and(eq(files.projectId, id), isNull(files.deletedAt), eq(files.uploadStatus, "uploaded")))
+				.orderBy(asc(itemFiles.createdAt), asc(files.createdAt), asc(files.id)),
 		]);
+		const thumbs = await signThumbUrls(
+			c.env,
+			attached.map((a) => a.thumbKey),
+		);
+		const attachmentsByItem = new Map<string, ItemAttachment[]>();
+		attached.forEach((a, i) => {
+			const list = attachmentsByItem.get(a.itemId) ?? [];
+			list.push({
+				fileId: a.fileId,
+				filename: a.filename,
+				category: a.category,
+				mimeType: a.mimeType,
+				thumbUrl: thumbs[i] ?? null,
+			});
+			attachmentsByItem.set(a.itemId, list);
+		});
 
 		const detail: ProjectDetail = {
 			id: project.id,
@@ -303,6 +340,7 @@ export const projectRoutes = new Hono<AppEnv>()
 						completedBy: i.completedById
 							? { id: i.completedById, name: i.completedByName ?? i.completedByEmail }
 							: null,
+						attachments: attachmentsByItem.get(i.id) ?? [],
 					})),
 			})),
 		};
