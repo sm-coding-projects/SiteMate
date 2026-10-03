@@ -39,9 +39,9 @@ export function LandingPage() {
 function SignInLink({ className, children = "Sign in" }: { className?: string; children?: ReactNode }) {
 	const { isSignedIn } = useAuth();
 	return (
-		<Link
-			to={isSignedIn ? "/projects" : "/sign-in"}
-			viewTransition
+		// A full page load, not client-side routing: on bfhapp.com the Worker sends it on to app.bfhapp.com.
+		<a
+			href={isSignedIn ? "/projects" : "/sign-in"}
 			className={className}
 			aria-label={isSignedIn ? "Open BFH App" : undefined}
 		>
@@ -52,7 +52,7 @@ function SignInLink({ className, children = "Sign in" }: { className?: string; c
 			) : (
 				children
 			)}
-		</Link>
+		</a>
 	);
 }
 

@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { JobMessage } from "../shared/api-types";
 import { createDb } from "./db";
+import { hostRedirect } from "./hosts";
 import { clerk, requireUser } from "./middleware/auth";
 import { handleQueue } from "./queue";
 import { adminRoutes } from "./routes/admin";
@@ -53,6 +54,13 @@ app.onError((err, c) => {
 });
 
 export default {
-	fetch: app.fetch,
+	// Page requests run here first (wrangler.jsonc run_worker_first) so each hostname serves its part of the site.
+	fetch(request, env, ctx) {
+		const url = new URL(request.url);
+		const moved = hostRedirect(url, env);
+		if (moved) return moved;
+		if (url.pathname === "/api" || url.pathname.startsWith("/api/")) return app.fetch(request, env, ctx);
+		return env.ASSETS.fetch(request);
+	},
 	queue: (batch, env) => handleQueue(batch, env),
 } satisfies ExportedHandler<Bindings, JobMessage>;
