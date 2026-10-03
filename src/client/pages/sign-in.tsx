@@ -49,7 +49,8 @@ function clerkAppearance(dark: boolean) {
 			borderRadius: "0.375rem",
 			fontFamily: "Archivo Variable, sans-serif",
 		},
-		// Token classes (not hex) so the borders and fills follow the theme with the rest of the page.
+		// Token classes (not hex) so the borders and fills follow the theme with the rest of the page. Hairlines use
+		// --line: Clerk sets its own --border (the primary colour) on its buttons, which would turn them hi-vis.
 		elements: {
 			rootBox: "w-full!",
 			cardBox: "w-full! max-w-none! rounded-none! border-0! shadow-none!",
@@ -57,17 +58,14 @@ function clerkAppearance(dark: boolean) {
 			headerTitle: "font-heading text-xl! font-bold! [font-stretch:112.5%]",
 			headerSubtitle: "text-sm!",
 			socialButtonsBlockButton:
-				"relative! min-h-11 border! border-border! shadow-none! transition-colors duration-[120ms] hover:bg-muted!",
-			// Clerk draws the Apple and GitHub marks in black.
-			socialButtonsProviderIcon__apple: "dark:invert",
-			socialButtonsProviderIcon__github: "dark:invert",
+				"relative! min-h-11 border! border-(--line)! shadow-none! transition-colors duration-[120ms] hover:bg-muted!",
 			lastAuthenticationStrategyBadge:
 				"absolute! top-1/2! right-2! left-auto! -translate-y-1/2! rounded-[3px]! border-0! bg-muted! px-1.5! py-0.5! font-mono! text-[0.6875rem]! font-medium! uppercase! tracking-wider! text-muted-foreground! shadow-none!",
 			formButtonPrimary:
 				"min-h-11 bg-none! shadow-none! border! border-primary-edge! font-semibold transition-colors duration-[120ms] after:hidden! hover:bg-primary-hover!",
 			buttonArrowIcon: "hidden!",
 			formFieldInput: "min-h-11 text-base shadow-none! border! border-solid! border-input!",
-			footer: "bg-none! bg-transparent! border-t! border-border!",
+			footer: "bg-none! bg-transparent! border-t! border-(--line)!",
 			footerAction: "hidden",
 		},
 	};
