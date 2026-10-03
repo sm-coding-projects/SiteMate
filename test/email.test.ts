@@ -77,6 +77,17 @@ describe("notification email", () => {
 		await api("/me/preferences", { as: VIEWER, method: "PATCH", body: { emailNotifications: true } });
 	});
 
+	it("skips people whose access was removed", async () => {
+		const { projectId, stageId } = await completedStage();
+		await api(`/admin/users/${VIEWER.id}/remove-access`, { as: ADMIN, method: "POST" });
+		await consume(
+			{ type: "notify", kind: "stage_completed", projectId, stageId, actorId: ADMIN.id },
+			emailEnv(),
+		);
+		expect(send).not.toHaveBeenCalled();
+		await api(`/admin/users/${VIEWER.id}/restore-access`, { as: ADMIN, method: "POST" });
+	});
+
 	it("stops at the daily limit and records the skip", async () => {
 		const { projectId, stageId } = await completedStage();
 		await consume(

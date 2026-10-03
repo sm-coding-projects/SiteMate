@@ -279,6 +279,8 @@ export interface TeamMember {
 	role: Role;
 	imageUrl: string | null;
 	lastSignInAt: number | null;
+	/** Access removed by an admin (banned in Clerk): can't sign in until restored. */
+	accessRemoved: boolean;
 	createdAt: number;
 }
 

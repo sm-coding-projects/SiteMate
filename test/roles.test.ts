@@ -44,6 +44,8 @@ async function writeRoutes() {
 		["POST", "/admin/invitations", { email: "a@b.co", role: "viewer" }],
 		["DELETE", `/admin/invitations/${id}`, undefined],
 		["PATCH", `/admin/users/${ADMIN.id}/role`, { role: "viewer" }],
+		["POST", `/admin/users/${ADMIN.id}/remove-access`, undefined],
+		["POST", `/admin/users/${ADMIN.id}/restore-access`, undefined],
 	] as const;
 }
 
@@ -115,6 +117,34 @@ describe("team management (admin)", () => {
 		);
 		const team = await api<Team>("/admin/team", { as: ADMIN });
 		expect(team.status).toBe(200);
+	});
+
+	it("removes and restores access: banned in Clerk, blocked at the API, logged", async () => {
+		await api("/me", { as: VIEWER }); // creates the local row
+		const self = await api<{ error: string }>(`/admin/users/${ADMIN.id}/remove-access`, {
+			as: ADMIN,
+			method: "POST",
+		});
+		expect(self.status).toBe(400);
+		expect(fakeClerk.users.banUser).not.toHaveBeenCalledWith(ADMIN.id);
+
+		const removed = await api(`/admin/users/${VIEWER.id}/remove-access`, { as: ADMIN, method: "POST" });
+		expect(removed.status).toBe(200);
+		expect(fakeClerk.users.banUser).toHaveBeenCalledWith(VIEWER.id);
+		// A session token issued before the ban is still valid for a minute; the API refuses it anyway.
+		expect((await api("/projects", { as: VIEWER })).status).toBe(403);
+
+		const restored = await api(`/admin/users/${VIEWER.id}/restore-access`, { as: ADMIN, method: "POST" });
+		expect(restored.status).toBe(200);
+		expect(fakeClerk.users.unbanUser).toHaveBeenCalledWith(VIEWER.id);
+		expect((await api("/projects", { as: VIEWER })).status).toBe(200);
+
+		const log = await env.DB.prepare(
+			"select action from activity where entity_id = ? and action like 'user.access_%' order by id",
+		)
+			.bind(VIEWER.id)
+			.all<{ action: string }>();
+		expect(log.results.map((r) => r.action)).toEqual(["user.access_removed", "user.access_restored"]);
 	});
 
 	it("changes roles but never lets an admin demote themselves", async () => {

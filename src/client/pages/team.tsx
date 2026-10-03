@@ -1,6 +1,7 @@
-import { MailPlus, X } from "lucide-react";
+import { MailPlus, UserCheck, UserX, X } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { Navigate } from "react-router";
+import { ConfirmDialog } from "@/components/confirm-dialog";
 import { initials, ROLE_LABEL } from "@/components/layout/user-menu";
 import { PageHeader } from "@/components/page-header";
 import { QueryError } from "@/components/query-state";
@@ -38,6 +39,10 @@ export function TeamPage() {
 		api(`/admin/users/${id}/role`, { method: "PATCH", body: JSON.stringify({ role }) }),
 	);
 	const revoke = useTeamMutation((api, id: string) => api(`/admin/invitations/${id}`, { method: "DELETE" }));
+	const access = useTeamMutation((api, { id, remove }: { id: string; remove: boolean }) =>
+		api(`/admin/users/${id}/${remove ? "remove-access" : "restore-access"}`, { method: "POST" }),
+	);
+	const [removing, setRemoving] = useState<TeamMember | null>(null);
 
 	if (isPending) return <Skeleton className="h-64" />;
 	if (me?.role !== "admin") return <Navigate to="/projects" replace />;
@@ -54,6 +59,19 @@ export function TeamPage() {
 				}
 			/>
 			<InviteDialog open={inviting} onOpenChange={setInviting} />
+			<ConfirmDialog
+				open={removing !== null}
+				onOpenChange={(o) => !o && setRemoving(null)}
+				title={`Remove access for ${removing?.name ?? removing?.email ?? ""}?`}
+				description="They're signed out everywhere within a minute and can't sign in again. Their notes, uploads and history stay. You can restore access later."
+				confirmLabel="Remove access"
+				destructive
+				pending={access.isPending}
+				onConfirm={() => {
+					if (!removing) return;
+					access.mutate({ id: removing.id, remove: true }, { onSuccess: () => setRemoving(null) });
+				}}
+			/>
 
 			<dl className="mb-8 grid gap-4 sm:grid-cols-2">
 				{(Object.keys(ROLE_HELP) as Role[]).map((r) => (
@@ -84,14 +102,20 @@ export function TeamPage() {
 									key={m.id}
 									member={m}
 									isMe={m.id === me.id}
-									pending={setRole.isPending && setRole.variables?.id === m.id}
+									pending={
+										(setRole.isPending && setRole.variables?.id === m.id) ||
+										(access.isPending && access.variables?.id === m.id)
+									}
 									onRole={(role) => setRole.mutate({ id: m.id, role })}
+									onRemove={() => setRemoving(m)}
+									onRestore={() => access.mutate({ id: m.id, remove: false })}
 								/>
 							))}
 						</ul>
 						{setRole.isError && (
 							<p className="mt-2 text-sm text-destructive">{errorMessage(setRole.error)}</p>
 						)}
+						{access.isError && <p className="mt-2 text-sm text-destructive">{errorMessage(access.error)}</p>}
 						<p className="mt-2 text-sm text-muted-foreground">
 							Role changes reach the person's session within about a minute.
 						</p>
@@ -138,12 +162,17 @@ function MemberRow({
 	isMe,
 	pending,
 	onRole,
+	onRemove,
+	onRestore,
 }: {
 	member: TeamMember;
 	isMe: boolean;
 	pending: boolean;
 	onRole: (role: Role) => void;
+	onRemove: () => void;
+	onRestore: () => void;
 }) {
+	const removed = member.accessRemoved;
 	return (
 		<li className="flex flex-wrap items-center gap-3 px-4 py-3">
 			<Avatar className="size-9">
@@ -159,20 +188,47 @@ function MemberRow({
 				</span>
 				<span className="block truncate text-sm text-muted-foreground">
 					{member.email}
-					{member.lastSignInAt ? ` · last in ${formatWhen(member.lastSignInAt)}` : " · not signed in yet"}
+					{removed
+						? ""
+						: member.lastSignInAt
+							? ` · last in ${formatWhen(member.lastSignInAt)}`
+							: " · not signed in yet"}
 				</span>
+				{removed && (
+					<span className="mt-0.5 flex items-center gap-1 text-sm font-medium text-destructive">
+						<UserX className="size-4" aria-hidden /> Access removed
+					</span>
+				)}
 			</span>
 			<NativeSelect
 				aria-label={`Role for ${member.name ?? member.email}`}
 				className="w-32"
 				value={member.role}
-				disabled={isMe || pending}
+				disabled={isMe || removed || pending}
 				title={isMe ? "You can't change your own role" : undefined}
 				onChange={(e) => onRole(e.target.value as Role)}
 			>
 				<option value="admin">Admin</option>
 				<option value="viewer">Viewer</option>
 			</NativeSelect>
+			{removed ? (
+				<Button variant="outline" size="sm" className="ml-auto" disabled={pending} onClick={onRestore}>
+					<UserCheck aria-hidden /> Restore access
+				</Button>
+			) : (
+				!isMe && (
+					<Button
+						variant="ghost"
+						size="sm"
+						className="ml-auto"
+						disabled={pending}
+						onClick={onRemove}
+						aria-label={`Remove access for ${member.name ?? member.email}`}
+					>
+						<UserX aria-hidden /> Remove access
+					</Button>
+				)
+			)}
 		</li>
 	);
 }

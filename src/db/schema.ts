@@ -49,6 +49,8 @@ export const users = sqliteTable("users", {
 	role: text("role", { enum: ROLES }).notNull().default("viewer"),
 	/** Opt-out for notification emails (Account page). */
 	emailNotifications: integer("email_notifications", { mode: "boolean" }).notNull().default(true),
+	/** Set when an admin removes their access (the Clerk user is banned). Blocks the API and notifications. */
+	accessRevokedAt: integer("access_revoked_at"),
 	createdAt: createdAt(),
 	updatedAt: updatedAt(),
 });

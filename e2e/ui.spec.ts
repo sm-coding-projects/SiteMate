@@ -196,3 +196,30 @@ test.describe("checklist attachments", () => {
 		await expect(page.getByRole("button", { name: /Actions for/ })).toHaveCount(0);
 	});
 });
+
+test.describe("team access", () => {
+	for (const width of [375, 1280]) {
+		test(`admins remove and restore access at ${width}px`, async ({ page }) => {
+			await page.setViewportSize({ width, height: 900 });
+			const { writes } = await installApi(page, "admin");
+			await page.goto("/team");
+
+			// Not offered on your own row.
+			await expect(page.getByRole("button", { name: "Remove access for Sam Site" })).toHaveCount(0);
+			await expect(page.getByText("Access removed")).toBeVisible();
+			await expect(page.getByRole("combobox", { name: "Role for Alex Former" })).toBeDisabled();
+			await noHorizontalScroll(page);
+			if (SHOTS) await page.screenshot({ path: `${SHOTS}/team-access-${width}.png`, fullPage: true });
+
+			await page.getByRole("button", { name: "Remove access for Priya Patel" }).click();
+			const dialog = page.getByRole("dialog", { name: "Remove access for Priya Patel?" });
+			if (SHOTS) await dialog.screenshot({ path: `${SHOTS}/team-remove-dialog-${width}.png` });
+			await dialog.getByRole("button", { name: "Remove access" }).click();
+			await expect(dialog).toBeHidden();
+			expect(writes).toContain("POST /admin/users/u2/remove-access");
+
+			await page.getByRole("button", { name: "Restore access" }).click();
+			await expect.poll(() => writes).toContain("POST /admin/users/u3/restore-access");
+		});
+	}
+});

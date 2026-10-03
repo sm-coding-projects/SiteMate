@@ -3,7 +3,7 @@
  * EMAIL_MODE=sandbox (default, no verified domain): every email goes to EMAIL_SANDBOX_TO with the intended
  * recipient in the subject. A rolling 24 h cap (EMAIL_DAILY_LIMIT, default 90) keeps us under Resend's 100/day.
  */
-import { and, eq, gte, ne, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, ne, sql } from "drizzle-orm";
 import { ulid } from "ulid";
 import { documentExtractions, emailLog, files, projectStages, projects, users } from "../db/schema";
 import type { ExtractionFields, JobMessage } from "../shared/api-types";
@@ -54,7 +54,7 @@ ${e.lines.map((l) => `<p style="margin:0 0 8px;font-size:15px;line-height:1.5">$
 }
 
 async function recipients(db: Db, opts: { adminsOnly: boolean; exclude?: string }) {
-	const where = [eq(users.emailNotifications, true)];
+	const where = [eq(users.emailNotifications, true), isNull(users.accessRevokedAt)];
 	if (opts.adminsOnly) where.push(eq(users.role, "admin"));
 	if (opts.exclude) where.push(ne(users.id, opts.exclude));
 	return db
