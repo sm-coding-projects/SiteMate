@@ -20,6 +20,8 @@ export const QUOTE_STATUSES = ["pending", "accepted", "rejected"] as const;
 export const EXTRACTION_STATUSES = ["queued", "processing", "needs_review", "confirmed", "failed"] as const;
 export const DOCUMENT_TYPES = ["quote", "invoice", "certificate", "plan", "contract", "other"] as const;
 export const ROLE_VALUES = ["admin", "viewer"] as const;
+/** Wire formats a custom AI endpoint can speak. */
+export const AI_PROTOCOLS = ["openai", "anthropic"] as const;
 
 // ── Primitives ───────────────────────────────────────────────────────────────
 
@@ -303,3 +305,23 @@ export const inviteCreate = z.object({
 });
 export const roleUpdate = z.object({ role: z.enum(ROLE_VALUES) });
 export const preferencesUpdate = z.object({ emailNotifications: z.boolean() });
+
+// ── AI model (admin) ─────────────────────────────────────────────────────────
+
+const aiBaseUrl = z
+	.url({ protocol: /^https$/, message: "Enter an https:// URL" })
+	.max(300)
+	.transform((u) => u.replace(/\/+$/, ""));
+const aiApiKey = z.string().trim().min(8, "Paste the full API key").max(500);
+
+/** Fetch the endpoint's model list. Without `apiKey`, the saved key is used. */
+export const aiModelsQuery = z.object({
+	protocol: z.enum(AI_PROTOCOLS),
+	baseUrl: aiBaseUrl,
+	apiKey: aiApiKey.optional(),
+});
+
+/** Save the workspace model. Without `apiKey`, the saved key is kept. */
+export const aiSettingsUpdate = aiModelsQuery.extend({
+	model: z.string().trim().min(1, "Choose a model").max(200),
+});

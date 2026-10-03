@@ -9,6 +9,10 @@ import {
 import { useCallback } from "react";
 import type {
 	ActivityEntry,
+	AiModel,
+	AiProtocol,
+	AiSettings,
+	AiTestResult,
 	ExtractionDetail,
 	ExtractionSummary,
 	FileEntry,
@@ -411,5 +415,45 @@ export function useTeamMutation<V>(fn: (api: Api, vars: V) => Promise<unknown>) 
 	return useMutation({
 		mutationFn: (vars: V) => fn(api, vars),
 		onSettled: () => qc.invalidateQueries({ queryKey: ["team"] }),
+	});
+}
+
+// ── AI model (admin) ─────────────────────────────────────────────────────────
+
+export type AiEndpointInput = { protocol: AiProtocol; baseUrl: string; apiKey?: string };
+
+export function useAiSettings() {
+	const api = useApi();
+	return useQuery({ queryKey: ["ai-settings"], queryFn: () => api<AiSettings>("/admin/ai") });
+}
+
+export function useAiModels() {
+	const api = useApi();
+	return useMutation({
+		mutationFn: (input: AiEndpointInput) =>
+			api<{ models: AiModel[] }>("/admin/ai/models", { method: "POST", ...json(input) }),
+	});
+}
+
+export function useTestAiModel() {
+	const api = useApi();
+	return useMutation({
+		mutationFn: (input: AiEndpointInput & { model: string }) =>
+			api<AiTestResult>("/admin/ai/test", { method: "POST", ...json(input) }),
+	});
+}
+
+export function useSaveAiSettings() {
+	const api = useApi();
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (input: (AiEndpointInput & { model: string }) | null) =>
+			input
+				? api<AiSettings>("/admin/ai", { method: "PUT", ...json(input) })
+				: api<AiSettings>("/admin/ai", { method: "DELETE" }),
+		onSuccess: (data) => {
+			qc.setQueryData(["ai-settings"], data);
+			qc.invalidateQueries({ queryKey: ["activity"] });
+		},
 	});
 }

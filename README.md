@@ -126,6 +126,7 @@ node scripts/secrets.mjs check   # shows which are set (name + prefix only, neve
 | `ANTHROPIC_API_KEY` | no | Enables `AI_PROVIDER=anthropic` |
 | `OPENAI_COMPAT_API_KEY`, `OPENAI_COMPAT_BASE_URL` | no | Enables `AI_PROVIDER=openai-compatible` |
 | `AI_GATEWAY_TOKEN` | no | Only if the gateway is set to *Authenticated* |
+| `SETTINGS_ENCRYPTION_KEY` | for Account → AI model | 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts the API key saved in the app. Changing it makes the saved key unreadable (re-enter it) |
 
 **Vars** (`wrangler.jsonc` → `vars`):
 
@@ -146,6 +147,14 @@ node scripts/secrets.mjs check   # shows which are set (name + prefix only, neve
 `VITE_CLERK_PUBLISHABLE_KEY` goes in `.env`; Vite inlines it at build time.
 
 ## AI providers
+
+**Workspace model (Account → AI model, admins).** Enter any OpenAI-compatible (`/chat/completions`) or
+Anthropic-compatible (`/v1/messages`) base URL and API key, fetch the endpoint's model list (or type a model ID),
+test it and save. That model then serves every AI call, overriding `AI_PROVIDER`; **Use the default** removes it.
+For a MiniMax token plan use `https://api.minimax.io/v1` (OpenAI format) or `https://api.minimax.io/anthropic`
+(Anthropic format) with model `MiniMax-M3`. The key is AES-GCM encrypted in D1 with `SETTINGS_ENCRYPTION_KEY`
+and never returned to the browser. These calls go straight to the endpoint (not through AI Gateway); file → text
+still uses Workers AI `toMarkdown` and image transcription.
 
 Extraction runs in the Queue consumer, never in a request: R2 → Workers AI `toMarkdown` (PDF/Office; images are
 transcribed by the vision model) → classify → extract with a JSON schema → validate in code → *needs review*.

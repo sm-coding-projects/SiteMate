@@ -19,6 +19,7 @@ import {
 	uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import {
+	AI_PROTOCOLS,
 	EXTRACTION_STATUSES,
 	FILE_CATEGORIES,
 	PROJECT_STATUSES,
@@ -317,6 +318,23 @@ export const emailLog = sqliteTable(
 	(t) => [index("email_log_created_idx").on(t.createdAt)],
 );
 
+// ── AI model ────────────────────────────────────────────────────────────────
+
+/**
+ * The workspace's own AI endpoint (one row, id "default"). When present it serves every AI call instead
+ * of the AI_PROVIDER default. The API key is AES-GCM encrypted with SETTINGS_ENCRYPTION_KEY.
+ */
+export const aiSettings = sqliteTable("ai_settings", {
+	id: text("id").primaryKey(),
+	protocol: text("protocol", { enum: AI_PROTOCOLS }).notNull(),
+	baseUrl: text("base_url").notNull(),
+	model: text("model").notNull(),
+	apiKeyEncrypted: text("api_key_encrypted").notNull(),
+	keyHint: text("key_hint").notNull(),
+	updatedBy: text("updated_by").references(() => users.id),
+	updatedAt: updatedAt(),
+});
+
 // ── Relations (for db.query … with) ─────────────────────────────────────────
 
 export const workflowTemplatesRelations = relations(workflowTemplates, ({ many }) => ({
@@ -341,3 +359,4 @@ export type ProjectItem = typeof projectItems.$inferSelect;
 export type FileRow = typeof files.$inferSelect;
 export type Extraction = typeof documentExtractions.$inferSelect;
 export type Quote = typeof quotes.$inferSelect;
+export type AiSettingsRow = typeof aiSettings.$inferSelect;

@@ -1,13 +1,24 @@
 /**
- * AI provider adapter (docs/DESIGN.md §5), chosen by AI_PROVIDER. Every call goes through the Cloudflare
- * AI Gateway named by AI_GATEWAY_ID. A provider is only used when its key is present; otherwise the
- * free Workers AI default is used.
+ * AI provider adapter (docs/DESIGN.md §5). An admin-configured endpoint (Account → AI model, stored in
+ * `ai_settings`) wins; otherwise AI_PROVIDER picks. The built-in providers go through the Cloudflare AI
+ * Gateway named by AI_GATEWAY_ID, and are only used when their key is present; otherwise the free
+ * Workers AI default is used.
  */
 import type Anthropic from "@anthropic-ai/sdk";
+import { eq } from "drizzle-orm";
+import { aiSettings } from "../../db/schema";
+import type { Db } from "../db";
+import { decryptSecret } from "../lib/secret-box";
 import type { Bindings } from "../types";
+import { complete, type Endpoint, stripThinking } from "./endpoint";
 import { MAX_DOCUMENT_CHARS, SYSTEM_PROMPT, TRANSCRIBE_PROMPT } from "./prompts";
 
-export type ProviderName = "workers-ai" | "anthropic" | "openai-compatible";
+export type ProviderName =
+	| "workers-ai"
+	| "anthropic"
+	| "openai-compatible"
+	| "custom-openai"
+	| "custom-anthropic";
 
 export interface SourceFile {
 	name: string;
@@ -63,8 +74,7 @@ async function toMarkdown(env: Bindings, file: SourceFile) {
 /** Strips ```json fences and parses; some models wrap JSON even in JSON mode. */
 export function parseJsonLoose(value: unknown): unknown {
 	if (typeof value !== "string") return value;
-	const s = value
-		.trim()
+	const s = stripThinking(value)
 		.replace(/^```(?:json)?\s*/i, "")
 		.replace(/```\s*$/, "");
 	try {
@@ -246,6 +256,51 @@ function openaiCompatible(env: Bindings, apiKey: string): Provider {
 			return parseJsonLoose(body.choices?.[0]?.message?.content ?? "");
 		},
 	};
+}
+
+// ── Workspace endpoint (Account → AI model) ─────────────────────────────────
+
+/** The model reasons before answering (MiniMax M3 always does), so leave room for both. */
+const CUSTOM_MAX_TOKENS = 16_000;
+
+function custom(env: Bindings, endpoint: Endpoint, model: string): Provider {
+	return {
+		name: endpoint.protocol === "anthropic" ? "custom-anthropic" : "custom-openai",
+		model,
+		async prepare(file) {
+			// File → text stays on Workers AI (free); the configured model does all the reading and reasoning.
+			if (isImage(file.mimeType)) return workersAi(env).prepare(file);
+			return truncate(await toMarkdown(env, file));
+		},
+		async json(input, prompt, schemaName, schema) {
+			if (input.kind !== "text") throw new Error("The configured model needs text input");
+			const text = await complete(endpoint, model, {
+				system: SYSTEM_PROMPT,
+				user: prompt(input.text),
+				maxTokens: CUSTOM_MAX_TOKENS,
+				schema: { name: schemaName, schema },
+			});
+			return parseJsonLoose(text);
+		},
+	};
+}
+
+/** The saved workspace endpoint with its key decrypted, or null when none is saved. */
+export async function loadCustomEndpoint(env: Bindings, db: Db) {
+	const row = await db.query.aiSettings.findFirst({ where: eq(aiSettings.id, "default") });
+	if (!row) return null;
+	const apiKey = await decryptSecret(env.SETTINGS_ENCRYPTION_KEY, row.apiKeyEncrypted);
+	return { row, endpoint: { protocol: row.protocol, baseUrl: row.baseUrl, apiKey } satisfies Endpoint };
+}
+
+/**
+ * The provider for every AI call: the admin-configured endpoint when one is saved, else AI_PROVIDER.
+ * If the saved key can't be decrypted (secret rotated or missing) this throws rather than silently
+ * switching to a different model.
+ */
+export async function resolveProvider(env: Bindings, db: Db): Promise<Provider> {
+	const saved = await loadCustomEndpoint(env, db);
+	return saved ? custom(env, saved.endpoint, saved.row.model) : selectProvider(env);
 }
 
 /** Providers that can run right now (their key is present). Workers AI is always available. */

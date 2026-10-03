@@ -135,3 +135,21 @@ test.describe("reduced motion", () => {
 		expect(Number.parseFloat(duration)).toBeLessThan(0.001);
 	});
 });
+
+test("admin picks a model from the endpoint's list on the Account page", async ({ page }) => {
+	await installApi(page, "admin");
+	await page.goto("/account");
+	const section = page.getByRole("region", { name: "AI model" });
+	await expect(section.getByText("@cf/meta/llama-4-scout-17b-16e-instruct")).toBeVisible();
+	await expect(section.getByLabel("Base URL")).toHaveValue("https://api.minimax.io/v1");
+	await section.getByRole("radio", { name: "Anthropic‑compatible" }).click();
+	await expect(section.getByLabel("Base URL")).toHaveValue("https://api.minimax.io/anthropic");
+	await section.getByLabel("API key").fill("sk-test-key-1234");
+	await section.getByRole("button", { name: "Fetch models" }).click();
+	await expect(section.getByText("3 models available.")).toBeVisible();
+	await expect(section.getByRole("combobox", { name: "Model" })).toHaveValue("MiniMax-M3");
+	await section.getByRole("button", { name: "Test connection" }).click();
+	await expect(section.getByText("MiniMax-M3 replied in 2.3s")).toBeVisible();
+	await expect(section.getByRole("button", { name: "Save and use everywhere" })).toBeEnabled();
+	if (SHOTS) await section.screenshot({ path: `${SHOTS}/account-ai-model.png` });
+});

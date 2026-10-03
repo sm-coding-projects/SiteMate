@@ -2,6 +2,7 @@ import { useClerk, useUser } from "@clerk/react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { LogOut, Monitor, Moon, Send, Sun } from "lucide-react";
 import { type ReactNode, useState } from "react";
+import { AiModelSettings } from "@/components/ai-model-settings";
 import { initials, ROLE_LABEL, UserAvatar } from "@/components/layout/user-menu";
 import { PageHeader } from "@/components/page-header";
 import { QueryError } from "@/components/query-state";
@@ -124,6 +125,16 @@ export function AccountPage() {
 					description="Sends through Resend. Without a verified domain, every email goes to the Resend account owner."
 				>
 					<EmailStatus />
+				</SettingsRow>
+			)}
+
+			{me?.role === "admin" && (
+				<SettingsRow
+					id="ai-h"
+					title="AI model"
+					description="Reads uploaded quotes and documents. Point it at any OpenAI‑ or Anthropic‑compatible endpoint, such as a MiniMax token plan. Applies to the whole workspace."
+				>
+					<AiModelSettings />
 				</SettingsRow>
 			)}
 

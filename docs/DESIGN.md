@@ -117,7 +117,9 @@ Retries: the consumer retries twice with backoff (30 s, 60 s), recording "Retryi
 Documents longer than 60k characters are cut and the reviewer is warned. If Workers AI rejects a JSON schema,
 the call is retried in plain JSON mode with the schema in the prompt.
 
-Provider adapter (`AI_PROVIDER` env):
+Provider adapter. An admin-saved workspace endpoint (`ai_settings` table, Account → AI model) takes precedence:
+any OpenAI- or Anthropic-compatible base URL + key + model (e.g. MiniMax M3 on a token plan), key encrypted with
+`SETTINGS_ENCRYPTION_KEY`. Otherwise `AI_PROVIDER` env:
 
 | Provider | Use | Cost |
 |---|---|---|

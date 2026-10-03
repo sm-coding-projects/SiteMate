@@ -30,6 +30,8 @@ export type Bindings = Omit<Env, Vars> & { [K in Vars]: string } & {
 	ANTHROPIC_API_KEY?: string;
 	OPENAI_COMPAT_API_KEY?: string;
 	OPENAI_COMPAT_BASE_URL?: string;
+	/** 32 random bytes, base64. Encrypts the API key saved under Account → AI model. */
+	SETTINGS_ENCRYPTION_KEY?: string;
 	/** AI Gateway token, when the gateway has "Authenticated Gateway" turned on. */
 	AI_GATEWAY_TOKEN?: string;
 	// Email
