@@ -1,154 +1,140 @@
-# Design System Master File
+# Design System Master File — "Site Survey"
 
 > **LOGIC:** When building a specific page, first check `design-system/sitemate/pages/[page-name].md`.
-> If that file exists, its rules **override** this Master file.
-> If not, strictly follow the rules below.
+> If that file exists, its rules **override** this Master file. If not, follow the rules below.
+
+**Project:** SiteMate · **Category:** Construction / field operations tool (B2B, mobile-first, outdoor use)
+**Direction (2026-10-03 review):** construction drawings and survey markings, not generic SaaS.
+**Implementation:** tokens in `src/client/styles/globals.css` (Tailwind v4 + shadcn/ui CSS variables).
+Components use semantic tokens (`bg-primary`, `text-muted-foreground`, `bg-hivis`, `text-survey`), never raw hex —
+except inside Clerk's `appearance` prop, which can't read CSS variables.
 
 ---
 
-**Project:** SiteMate
-**Generated:** 2026-10-03 (ui-ux-pro-max v2.13.0), then corrected by hand — see "Changes from generated output"
-**Category:** Construction / field operations tool (B2B, mobile-first, outdoor use)
-**Design Dials:** Variance 3/10 (Centered / Minimal) | Motion 2/10 (Subtle) | Density 7/10 (Standard)
+## Colour
 
-**Implementation:** tokens live in `src/client/styles/globals.css` (Tailwind v4 + shadcn/ui CSS variables).
-Components must use semantic tokens (`bg-primary`, `text-muted-foreground`, `status-*`), never raw hex.
+Cool neutrals plus one high-visibility accent. **No orange anywhere**, logo included.
 
----
+| Token | Light | Dark | Use |
+|-------|-------|------|-----|
+| `--paper` → `--background` | `#F4F5F2` | `#0F1214` | Page |
+| `--surface` → `--card` | `#FFFFFF` | `#171B1E` | Cards (popover `#1E2327` in dark) |
+| `--ink` → `--foreground` | `#0F1214` (17.2:1 on paper) | `#EEF0EC` (16.4:1) | Text; the dark hero/panels |
+| `--graphite` → `--muted-foreground` | `#5B6168` (5.7:1 paper, 6.3:1 white) | `#9AA1A8` (6.6:1 on card) | Secondary text |
+| `--line` → `--border` | `#D9DCD6` | `#2A2F33` | Hairlines |
+| `--input` | `#8A9096` (3.2:1 non-text) | `#737A81` | Form borders |
+| `--hivis` → `--primary` | `#E8FF3C` | same | **"Where you are now"** only: current stage, active nav, primary action. Always ink text on it (16.8:1), never white |
+| `--survey` → `--link` | `#2E5BFF` (5.2:1 white) | `#7B93FF` (6.7:1 on ink) | Line drawings, links, motion strokes |
+| `--ring` | ink | hi-vis | Focus ring |
 
-## Global Rules
+**Hi-vis on paper is 1.02:1** — invisible on its own. On light surfaces every hi-vis fill gets an ink edge
+(`--primary-edge`: 1px border on buttons, inset ring on bar segments and rail nodes). The focus ring is ink on
+paper and hi-vis on ink.
 
-### Color Palette — Light (default)
+Dark mode is its own palette, not an inversion: sidebar `#0B0D0F` < page `#0F1214` < card `#171B1E` < popover `#1E2327`.
+`.theme-ink` makes any block an always-dark island (landing hero, login drawing panel).
 
-| Role | Hex | Token | Contrast |
-|------|-----|-------|----------|
-| Background | `#F8FAFC` | `--background` | — |
-| Foreground | `#0F172A` | `--foreground` | 17.1:1 AAA |
-| Card | `#FFFFFF` | `--card` | — |
-| Card foreground | `#0F172A` | `--card-foreground` | 17.9:1 AAA |
-| Primary (safety orange) | `#EA580C` | `--primary` | — |
-| Primary foreground | `#0B0F14` | `--primary-foreground` | 5.4:1 AA |
-| Secondary | `#E2E8F0` | `--secondary` | — |
-| Secondary foreground | `#0F172A` | `--secondary-foreground` | AAA |
-| Muted | `#F1F5F9` | `--muted` | — |
-| Muted foreground | `#475569` | `--muted-foreground` | 7.6:1 on card (AAA), 6.9:1 on muted |
-| Accent (hover surface) | `#F1F5F9` | `--accent` | — |
-| Destructive | `#B91C1C` | `--destructive` | white text 6.5:1 |
-| Success | `#15803D` | `--success` | 5.0:1 on white |
-| Warning | `#B45309` | `--warning` | 5.0:1 on white |
-| Border (decorative) | `#CBD5E1` | `--border` | — |
-| Input border | `#64748B` | `--input` | 4.8:1 (meets 3:1 non-text) |
-| Focus ring | `#0F172A` | `--ring` | 17:1 |
+### Status (never colour alone — icon + label)
 
-### Color Palette — Dark
-
-| Role | Hex | Token | Contrast |
-|------|-----|-------|----------|
-| Background | `#020617` | `--background` | — |
-| Foreground | `#F1F5F9` | `--foreground` | 18.4:1 AAA |
-| Card | `#0F172A` | `--card` | fg 16.3:1 |
-| Primary | `#F97316` | `--primary` | fg `#0B0F14` 6.9:1 |
-| Muted | `#1E293B` | `--muted` | — |
-| Muted foreground | `#94A3B8` | `--muted-foreground` | 7.0:1 on card |
-| Destructive | `#F87171` | `--destructive` | fg `#0B0F14` 7.0:1 |
-| Border | `#334155` / input `#64748B` | `--border` / `--input` | input 3.8:1 |
-| Focus ring | `#FDBA74` | `--ring` | 12:1 |
-
-### Status colours (never colour alone — always icon + label)
-
-| Status | Lucide icon | Light fg / bg | Dark fg / bg |
-|--------|-------------|---------------|--------------|
-| `not_started` | `Circle` | `#334155` / `#F1F5F9` (9.5:1) | `#CBD5E1` / `#1E293B` |
-| `in_progress` | `CircleDashed` | `#9A3412` / `#FFEDD5` (6.4:1) | `#FDBA74` / `#431407` |
-| `complete` | `CircleCheck` | `#166534` / `#DCFCE7` (6.5:1) | `#86EFAC` / `#052E16` |
-| `on_hold` | `CirclePause` | `#1E40AF` / `#DBEAFE` (7.2:1) | `#93C5FD` / `#172554` |
-
-Project status `active` / `archived` reuse `in_progress` / `not_started` styling with their own icons
-(`HardHat`, `Archive`).
-
-### Typography
-
-- **Font:** Inter (variable, self-hosted via `@fontsource-variable/inter` — no Google Fonts request on slow 4G)
-- **Numbers:** `font-variant-numeric: tabular-nums` for money, dates and counts
-- **Scale:** body 16px / 1.5 (never below 14px for secondary text), labels 14px/600, page title 24px/700
-  (28px ≥768px), section title 18px/600
-- **Mono:** system `ui-monospace` stack for ids/ABNs only
-
-### Spacing
-
-Tailwind's 4px scale. Standard padding 16px (mobile) / 24px (≥768px). Gap between touch targets ≥ 8px.
-
-### Touch targets
-
-Minimum **44×44px** for every interactive element (buttons `h-11`, icon buttons `size-11`, nav items ≥ 56px tall
-on the mobile tab bar). This is above WCAG's 24px web minimum on purpose — users may wear gloves.
-
-### Radius & elevation
-
-Radius 8px (`--radius: 0.5rem`). Flat surfaces with 1px borders; shadows only for overlays (menus, dialogs).
-No hover lift transforms.
+| Status | Icon | Light fg / bg | Dark fg / bg |
+|--------|------|---------------|--------------|
+| `not_started` | `Circle` | `#3F454B` / `#ECEEE9` | `#CFD3D7` / `#22272B` |
+| `in_progress` | `CircleDashed` | ink / hi-vis | ink / hi-vis |
+| `complete` | `CircleCheck` | `#166534` / `#DCFCE7` | `#86EFAC` / `#052E16` |
+| `on_hold` | `CirclePause` | `#1F3FB8` / `#E3E9FF` | `#A9B8FF` / `#17204A` |
 
 ---
 
-## Component Specs
+## Type
 
-- **Primary button:** `bg-primary text-primary-foreground`, 44px tall, 600 weight, hover = 8% darker, no transform.
-  One primary action per screen.
-- **Secondary button:** `bg-secondary`; **outline** for tertiary; **ghost** only inside toolbars/menus.
-- **Inputs:** 44px tall, 16px font (prevents iOS zoom), 1px `--input` border, visible label above, error text below.
-- **Cards:** `bg-card` + `border`, radius 8px, 16–24px padding, no shadow.
-- **Status badge:** pill, icon + text, tinted bg + strong fg from the status table.
-- **Focus:** 2px `--ring` outline with 2px offset on every focusable element (`focus-visible`).
-- **Modals:** solid overlay `rgba(2,6,23,0.6)` — no backdrop blur.
+All self-hosted via Fontsource (no Google Fonts round-trip on slow 4G).
 
----
-
-## Style Guidelines
-
-**Style:** Minimalism & Swiss Style — clean, functional, high contrast, grid-based, sans-serif.
-
-**Page pattern:** App shell (not a marketing page). Desktop: fixed left sidebar (240px) + content column (max 1200px).
-Mobile: top app bar + bottom tab bar (≤ 5 items, icon + label) respecting `env(safe-area-inset-bottom)`.
-
-**Motion:** 150–200ms colour/opacity transitions only. No scroll reveals, no GSAP, no parallax.
-All transitions disabled under `prefers-reduced-motion: reduce`.
+- **Headings:** Archivo variable at **semi-expanded width** (`font-stretch: 112.5%`), 600–700, tight tracking,
+  balanced wrap. Applied to `h1`–`h3` in the base layer; `.stretch-semi` elsewhere.
+- **Wordmark:** Archivo **expanded** (`.stretch-expanded`, 125%), 700.
+- **Body:** Archivo at normal width, 16px / 1.5, never below 14px.
+- **Data:** IBM Plex Mono 400/500 via `.label-mono` (13px, uppercase, +0.04em, tabular) for stage codes,
+  counts, timestamps and addresses — `STAGE 04/08 · FRAME`, `11/30`, `09:42`, `14 BANKSIA ST`.
+- Trade terms use a non-breaking hyphen (U+2011): "Pre‑construction" never splits. Copy capped at 60ch.
 
 ---
 
-## Anti-Patterns (Do NOT Use)
+## Motif
 
-- ❌ Hero sections, marketing layouts, decorative illustrations
-- ❌ AI purple/pink gradients, glassmorphism, backdrop blur
-- ❌ Status conveyed by colour alone
-- ❌ Emojis as icons — Lucide only
-- ❌ Gray-on-gray low-contrast text; text under 14px
-- ❌ Hover-only affordances (touch users can't hover)
-- ❌ Layout-shifting hover transforms
-- ❌ Invisible focus states
-
----
-
-## Pre-Delivery Checklist
-
-- [ ] No emojis used as icons; Lucide only
-- [ ] All interactive elements ≥ 44×44px with `cursor-pointer`
-- [ ] Text contrast ≥ 4.5:1 (body ≥ 7:1) in light and dark
-- [ ] Focus states visible for keyboard navigation
-- [ ] `prefers-reduced-motion` respected
-- [ ] Responsive at 375px, 768px, 1280px — no horizontal scroll
-- [ ] No content hidden behind the fixed tab bar / safe area
+- **The 8-segment bar** (`<StageBar>`) is the signature, repeated identically in the logo mark, landing hero,
+  login card top edge and project card: done = ink (paper on ink surfaces), current = hi-vis, to come = line.
+- **Stage rail** (`<StageRail>`): survey line — done = solid ink node + solid connector, current = hi-vis node with
+  soft pulse, to come = dashed outline node + dashed connector.
+- **Line drawings** in survey blue, one stroke weight. The house drawing (`<HouseDrawing>`) builds in template order.
+- **Faint 8px grid** (`.bg-grid`, stronger every 64px) on ink panels; **diagonal hatching** (`.bg-hatch`) for
+  "to be supplied" placeholders, labelled `IMG` in mono; **registration ticks** on example cards; **dimension lines**.
+- **Icons:** Lucide only, one weight: 1.25px stroke globally (`.lucide` in CSS). 18px in nav and rows.
+- **Logo:** ink plate carrying the 8-segment bar with segment 4 in hi-vis + "SiteMate" in Archivo Expanded.
 
 ---
 
-## Changes from generated output
+## Motion
 
-| Generated | Changed to | Why |
-|-----------|-----------|-----|
-| Pattern: Hero-Centric Design | App shell (sidebar / bottom tabs) | SiteMate is an authenticated tool, not a landing page |
-| Body font: Playfair Display | Inter | Serif display face is poor for small UI text in sunlight; Inter has a tall x-height and tabular figures |
-| Primary `#64748B` slate, accent orange | Primary = safety orange, neutrals slate | Brief asked for one construction accent; orange-with-dark-text reads like hi-vis gear |
-| Foreground `#334155` | `#0F172A` | Maximum contrast outdoors |
-| Border `#E2E8F0` on inputs | `#64748B` input border | Light border failed 3:1 non-text contrast |
-| GSAP scroll reveal | None | Motion dial 2; no scroll-driven content in an app shell |
-| Card hover lift / shadow | Flat bordered cards | Avoid layout shift; cards aren't all clickable |
-| Modal backdrop blur | Solid overlay | Brief forbids glassmorphism; cheaper on low-end phones |
+| | Value |
+|---|---|
+| Hover / press | 120ms |
+| Small transitions | 200ms |
+| Panels / pages | 320ms |
+| Hero sequences | 600–900ms per step, landing and login only |
+| Easing | enter `cubic-bezier(0.2,0,0,1)` (`ease-enter`), exit `cubic-bezier(0.4,0,1,1)` (`ease-exit`). No bounce |
+| Stagger | 40ms between list items |
+| Page change | 8px fade-up, content only (`animate-page-in`, keyed on route); sidebar stays still |
+
+Signature moments: stage segments fill then counts roll up (`useCountUp`); new activity rows slide in from the top
+(`animate-row-in`); line drawings draw themselves (`.draw` + `pathLength="1"`); hero bar morphs into the login card's
+top edge (View Transitions API via React Router `viewTransition`, `view-transition-name: stage-bar`).
+Implemented with CSS + small hooks (`src/client/hooks/use-motion.ts`) — no animation library.
+
+**Reduced motion:** all transitions/animations collapse to ~0ms; sequences jump to the finished state (the hero
+shows the completed drawing); view transitions are disabled.
+
+---
+
+## Layout & spacing
+
+Spacing scale **4 / 8 / 12 / 16 / 24 / 32 / 48px**. Radius **6px** (`--radius: 0.375rem`). Flat surfaces, hairline
+borders; shadows only on overlays. One content width: max 1200px, 40px side padding ≥768px.
+App shell: 224px sidebar ≥768px; top bar + bottom tab bar (≤5 items) below, safe-area aware.
+
+**Touch targets ≥ 44×44px** (gloves). Exception: segmented controls may shrink to 32px under `pointer-fine:`.
+
+---
+
+## Components
+
+- **Primary button:** hi-vis fill, ink text, 1px ink edge (light), 44px, 600. One per screen, top-right in the page header.
+- **Unavailable action:** `aria-disabled="true"` (stays focusable) → muted surface + muted text, with the reason in
+  a tooltip and visible copy ("Coming in the next update").
+- **Page header:** title + one-line description left, primary action right.
+- **Sidebar:** "Workspace" group; active = 4px hi-vis bar (ink edge) + ink label, no fill. User block = initials on ink
+  (real photo only if uploaded), name, role as plain muted text; block → Account, ⋮ → theme + sign out.
+- **Activity row:** bare icon · mono stage tag (survey tint) · sentence · right-aligned mono time.
+- **Empty states:** no dashed boxes or icon-in-circle. Show a labelled example ("Example — not real data").
+- **Clerk:** flattened inside our own card; flat hi-vis button, ink text, no gradient/shadow/arrow; 6px radius;
+  hairlines; "last used" as a mono tag inside the button.
+
+---
+
+## Anti-patterns
+
+- ❌ Orange, cream/terracotta, purple gradients, glassmorphism, backdrop blur
+- ❌ Hi-vis as decoration, or with white text, or on paper without an ink edge
+- ❌ Inter-everywhere / a single generic sans; mixed icon weights
+- ❌ Grey icon-in-square rows, dashed-box empty states, cartoon avatars
+- ❌ Status by colour alone; text under 14px outside mono labels; hover-only affordances; bounce easing
+
+---
+
+## Pre-delivery checklist
+
+- [ ] Hi-vis only marks "where you are now"; ink text on it; ink edge on light surfaces
+- [ ] Focus visible (ink on paper, hi-vis on ink)
+- [ ] Text ≥ 4.5:1 in light and dark
+- [ ] Touch targets ≥ 44px
+- [ ] `prefers-reduced-motion` shows final states
+- [ ] 375 / 768 / 1280px with no horizontal scroll

@@ -1,5 +1,5 @@
 import { KeyRound } from "lucide-react";
-import { Wordmark } from "@/components/wordmark";
+import { Wordmark } from "@/components/brand/wordmark";
 
 /** Shown instead of the app when the build has no Clerk publishable key. */
 export function SetupRequired() {
