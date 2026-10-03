@@ -6,6 +6,9 @@ import { clerk, requireUser } from "./middleware/auth";
 import { handleQueue } from "./queue";
 import { adminRoutes } from "./routes/admin";
 import { meRoutes } from "./routes/me";
+import { activityRoutes, noteRoutes, projectNoteRoutes } from "./routes/notes";
+import { projectRoutes, templateRoutes } from "./routes/projects";
+import { itemRoutes, projectStageRoutes, stageRoutes } from "./routes/stages";
 import type { AppEnv, Bindings } from "./types";
 
 const app = new Hono<AppEnv>().basePath("/api");
@@ -22,6 +25,14 @@ app.get("/health", (c) => c.json({ ok: true, env: c.env.APP_ENV, time: Date.now(
 app.use(clerk(), requireUser());
 app.route("/me", meRoutes);
 app.route("/admin", adminRoutes);
+app.route("/templates", templateRoutes);
+app.route("/projects", projectRoutes);
+app.route("/projects", projectStageRoutes);
+app.route("/projects", projectNoteRoutes);
+app.route("/stages", stageRoutes);
+app.route("/items", itemRoutes);
+app.route("/notes", noteRoutes);
+app.route("/activity", activityRoutes);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 
