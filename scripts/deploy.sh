@@ -8,9 +8,14 @@ ORIGIN="${1:?Pass the app origin, e.g. https://app.bfhapp.com}"
 ORIGIN="${ORIGIN%/}"
 ORIGINS=("$@")
 
-echo "▸ Checking local secrets (names and prefixes only)"
+echo "▸ Checking production secrets (names and prefixes only)"
 node scripts/secrets.mjs check
-grep -q '^VITE_CLERK_PUBLISHABLE_KEY=pk_' .env || { echo ".env needs VITE_CLERK_PUBLISHABLE_KEY (inlined at build time)"; exit 1; }
+# `vite build` reads .env.production over .env, so the SPA gets the production Clerk key and `pnpm dev` keeps
+# the development one.
+grep -q '^VITE_CLERK_PUBLISHABLE_KEY=pk_live_' .env.production 2>/dev/null || {
+	echo ".env.production needs VITE_CLERK_PUBLISHABLE_KEY=pk_live_… (production instance, inlined at build time)"
+	exit 1
+}
 
 echo "▸ Quality gates"
 pnpm typecheck && pnpm lint && pnpm test

@@ -25,7 +25,8 @@ backed by D1, R2, Queues and Workers AI, with Clerk for auth and Resend for emai
 
 - Node 22+ and pnpm 10+
 - A Cloudflare account (free plan), logged in with `pnpm wrangler login`
-- A Clerk application (free Hobby plan) — use the **development** instance until there is a custom domain
+- A Clerk application (free Hobby plan): the **development** instance for `pnpm dev`, a **production** instance
+  on the custom domain for the deployed app
 - A Resend account (free) for email
 
 ## Project layout
@@ -75,7 +76,11 @@ with an R2 API token (the Worker binding can't sign URLs).
 
 ### 3. Clerk
 
-In the [Clerk dashboard](https://dashboard.clerk.com) for the development instance:
+Clerk has two instances with separate users, settings and keys: **development** (`pk_test_`/`sk_test_`, for
+`pnpm dev` on localhost) and **production** (`pk_live_`/`sk_live_`, for `bfhapp.com`). Live keys don't work on
+localhost, and test keys don't belong in production, so each has its own files (see step 5).
+
+In the [Clerk dashboard](https://dashboard.clerk.com), for **each** instance:
 
 1. **Configure → Restrictions → Sign-up mode: Restricted.** Users can only join by invitation.
 2. **Configure → Sessions → Customize session token**, add these claims so the API can read the user's
@@ -87,14 +92,32 @@ In the [Clerk dashboard](https://dashboard.clerk.com) for the development instan
      "role": "{{user.public_metadata.role}}"
    }
    ```
-3. Make yourself an admin: **Users** → you → **Metadata → Public** → `{ "role": "admin" }`.
+3. Make yourself an admin. Restricted sign-up blocks the very first account too, so create it by hand:
+   **Users → Create user** with your email (the same address as your Google account), then **Metadata →
+   Public** → `{ "role": "admin" }`. **Sign in** (not sign up) with Google or that email; Clerk links the Google
+   account to the user by email.
 
 After that, invite everyone else from **BFH App → Team** (Clerk emails the invitation; the role is stored in
 `publicMetadata.role`). Anyone without `"role": "admin"` is a read-only **viewer**. Role changes reach a session
-when its token refreshes (within about a minute).
+when its token refreshes (within about a minute). Users don't carry over between instances: invite people again
+in production.
 
-The development instance works on `*.workers.dev`; no allowed-origins setting is needed for it. The Worker's
-`AUTHORIZED_PARTIES` must list the app's origin.
+**Production instance, once.** Create it from the instance switcher (clone the development settings), with
+`bfhapp.com` as the domain, then:
+
+- **DNS:** add the CNAMEs from **Domains** (`clerk.`, `accounts.`, `clkmail.`, `clk._domainkey.`,
+  `clk2._domainkey.`) in Cloudflare as **DNS only** (grey cloud); proxied records fail verification. The mail
+  records are what keep invitations out of spam.
+- **Google sign-in:** development borrows Clerk's shared Google credentials; production needs your own, or Google
+  answers `Missing required parameter: client_id`. In Google Cloud Console create an OAuth consent screen
+  (External, authorised domain `bfhapp.com`, then **Publish app** so it's *In production*) and an OAuth client
+  ID (*Web application*, origin `https://app.bfhapp.com`, redirect URI
+  `https://clerk.bfhapp.com/v1/oauth_callback`). Paste the client ID and secret into **Configure → SSO
+  connections → Google → Use custom credentials**. The same goes for any other social provider.
+- Repeat steps 1–3 above; cloning doesn't copy users, and check the settings carried over.
+
+A production instance only serves its own domain and subdomains, so sign-in works on `app.bfhapp.com`, not on
+`*.workers.dev`. The Worker's `AUTHORIZED_PARTIES` must list the app's origin (the deploy script sets it).
 
 ### 4. Resend
 
@@ -106,14 +129,26 @@ intended recipient in the subject, e.g. `[to priya@example.com] Frame complete �
 ### 5. Local environment files
 
 ```bash
-cp .dev.vars.example .dev.vars   # Worker secrets and local overrides
-cp .env.example .env             # SPA: VITE_CLERK_PUBLISHABLE_KEY
-node scripts/secrets.mjs check   # shows which are set (name + prefix only, never values)
+cp .dev.vars.example .dev.vars     # Worker secrets for pnpm dev (Clerk development instance)
+cp .env.example .env               # SPA for pnpm dev: VITE_CLERK_PUBLISHABLE_KEY=pk_test_…
+cp .prod.vars.example .prod.vars   # Production overrides: the Clerk production keys (sk_live_/pk_live_)
+echo 'VITE_CLERK_PUBLISHABLE_KEY=pk_live_…' > .env.production   # SPA for production builds
+node scripts/secrets.mjs check     # production secrets, name + prefix only, never values
 ```
+
+| File | Used by | Clerk instance |
+|---|---|---|
+| `.dev.vars` | `pnpm dev`, tests; production for every non-Clerk secret not in `.prod.vars` | development |
+| `.env` | `pnpm dev` | development |
+| `.prod.vars` | `scripts/deploy.sh` → Worker secrets (Clerk keys come only from here) | production |
+| `.env.production` | `vite build` (read over `.env`) | production |
+
+All four are gitignored. The deploy refuses to run with test Clerk keys.
 
 ## Configuration reference
 
-**Secrets** (`.dev.vars` locally; `node scripts/secrets.mjs push <origin>` for production):
+**Secrets** (`.dev.vars` locally; `.prod.vars` over `.dev.vars` for production, uploaded by
+`node scripts/secrets.mjs push <origin>`):
 
 | Name | Required | Purpose |
 |---|---|---|
@@ -145,7 +180,8 @@ node scripts/secrets.mjs check   # shows which are set (name + prefix only, neve
 | `EMAIL_FROM` | `BFH App <onboarding@resend.dev>` | Sender |
 | `EMAIL_DAILY_LIMIT` | `90` | Rolling 24 h cap (Resend free: 100/day) |
 
-`VITE_CLERK_PUBLISHABLE_KEY` goes in `.env`; Vite inlines it at build time.
+`VITE_CLERK_PUBLISHABLE_KEY` goes in `.env` (development) and `.env.production` (production builds); Vite
+inlines it at build time.
 
 ## AI providers
 
@@ -202,18 +238,19 @@ certificates on deploy) plus the workers.dev fallback:
 |---|---|
 | `bfhapp.com` | The landing page. Every other path 301s to the same path on `app.bfhapp.com`; `www.` 301s to the bare domain |
 | `app.bfhapp.com` | The app, sign-in and `/api`. `/` 302s to `/projects` |
-| `sitemate.<subdomain>.workers.dev` | Everything, on one origin (unchanged) |
+| `sitemate.<subdomain>.workers.dev` | Everything, on one origin, but Clerk production sign-in doesn't work here |
 
 Page requests run through the Worker first (`run_worker_first`) for this; built files under `/assets` don't.
 `SITE_HOST`/`APP_HOST` in `vars` set the two hosts (unset either to serve everything everywhere).
 
 ```bash
-scripts/deploy.sh https://app.bfhapp.com https://sitemate.<subdomain>.workers.dev
+scripts/deploy.sh https://app.bfhapp.com
 ```
 
 The first origin becomes `APP_URL` (email links); all of them go into `AUTHORIZED_PARTIES` and the R2 CORS
-rules. It checks secrets, runs typecheck/lint/tests, applies remote migrations, uploads secrets from
-`.dev.vars` (values are piped, never printed), sets R2 CORS, builds, deploys and calls `/api/health`. To redeploy code only: `pnpm run deploy`. (Note: plain `pnpm deploy` is pnpm's
+rules. It checks the production secrets (live Clerk keys in `.prod.vars` and `.env.production`), runs
+typecheck/lint/tests, applies remote migrations, uploads secrets from `.prod.vars` over `.dev.vars` (values are
+piped, never printed), sets R2 CORS, builds, deploys and calls `/api/health`. To redeploy code only: `pnpm run deploy`. (Note: plain `pnpm deploy` is pnpm's
 own workspace command, not this script.)
 
 Watch the Worker and the queue consumer with `pnpm wrangler tail`.
