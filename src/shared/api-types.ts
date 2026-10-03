@@ -64,6 +64,15 @@ export interface ProjectSummary {
 	recentPhotos: { id: string; thumbUrl: string | null }[];
 }
 
+/** A project file attached to a checklist item. */
+export interface ItemAttachment {
+	fileId: string;
+	filename: string;
+	category: FileCategory;
+	mimeType: string;
+	thumbUrl: string | null;
+}
+
 export interface ProjectItem {
 	id: string;
 	title: string;
@@ -71,6 +80,8 @@ export interface ProjectItem {
 	source: Source;
 	completedAt: number | null;
 	completedBy: { id: string; name: string | null } | null;
+	/** Oldest first. */
+	attachments: ItemAttachment[];
 }
 
 export interface ProjectStage {

@@ -153,3 +153,46 @@ test("admin picks a model from the endpoint's list on the Account page", async (
 	await expect(section.getByRole("button", { name: "Save and use everywhere" })).toBeEnabled();
 	if (SHOTS) await section.screenshot({ path: `${SHOTS}/account-ai-model.png` });
 });
+
+test.describe("checklist attachments", () => {
+	for (const width of [375, 1280]) {
+		test(`admin attaches existing photos and documents to a check at ${width}px`, async ({ page }) => {
+			await page.setViewportSize({ width, height: 900 });
+			const { writes } = await installApi(page, "admin");
+			await page.goto("/projects/p1?stage=s3");
+
+			// Already attached: two photos on "Slab pour photos", a certificate on the termite check.
+			const attached = page.getByRole("list", { name: "Attached files" });
+			await expect(attached.first().getByRole("button", { name: /Open photo IMG_100[12]/ })).toHaveCount(2);
+			await expect(page.getByRole("button", { name: "Termite protection certificate.pdf" })).toBeVisible();
+
+			await page.getByRole("button", { name: "Actions for Slab pour photos" }).click();
+			await page.getByRole("menuitem", { name: "Attach photos & documents" }).click();
+			const dialog = page.getByRole("dialog", { name: "Attach to “Slab pour photos”" });
+			await expect(dialog.getByText("2 files attached")).toBeVisible();
+			await expect(dialog.getByRole("checkbox", { name: /IMG_1001/ })).toBeChecked();
+
+			const option = (name: RegExp) => dialog.locator("label", { has: page.getByRole("checkbox", { name }) });
+			await option(/IMG_1003/).click();
+			await expect(dialog.getByRole("checkbox", { name: /IMG_1003/ })).toBeChecked();
+			await dialog.getByRole("tab", { name: "documents" }).click();
+			await option(/Harbour Frames/).click();
+			await expect(dialog.getByText("4 files attached")).toBeVisible();
+			if (SHOTS) await dialog.screenshot({ path: `${SHOTS}/attach-dialog-${width}.png` });
+
+			await dialog.getByRole("button", { name: "Save" }).click();
+			await expect(dialog).toBeHidden();
+			expect(writes).toContain("PUT /items/s3i2/files");
+			await noHorizontalScroll(page);
+			if (SHOTS)
+				await page.screenshot({ path: `${SHOTS}/checklist-attachments-${width}.png`, fullPage: true });
+		});
+	}
+
+	test("viewers see and can open attachments but can't change them", async ({ page }) => {
+		await installApi(page, "viewer");
+		await page.goto("/projects/p1?stage=s3");
+		await expect(page.getByRole("button", { name: "Termite protection certificate.pdf" })).toBeVisible();
+		await expect(page.getByRole("button", { name: /Actions for/ })).toHaveCount(0);
+	});
+});

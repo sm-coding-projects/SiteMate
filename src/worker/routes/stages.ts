@@ -1,10 +1,18 @@
-import { asc, count, eq, max, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, max, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { ulid } from "ulid";
-import { projectItems, projectStages } from "../../db/schema";
+import { files, itemFiles, projectItems, projectStages } from "../../db/schema";
 import type { JobMessage } from "../../shared/api-types";
 import { applyManualStatus, deriveStageStatus, type StageState } from "../../shared/progress";
-import { idParam, itemCreate, itemUpdate, reorderBody, stageCreate, stageUpdate } from "../../shared/schemas";
+import {
+	idParam,
+	itemCreate,
+	itemFilesUpdate,
+	itemUpdate,
+	reorderBody,
+	stageCreate,
+	stageUpdate,
+} from "../../shared/schemas";
 import { logActivity, touchProject } from "../lib/activity";
 import { runBatch, type Statement } from "../lib/batch";
 import { badRequest, notFound, zv } from "../lib/validate";
@@ -413,6 +421,81 @@ export const itemRoutes = new Hono<AppEnv>()
 		await runBatch(db, statements);
 		if (job) await c.env.JOBS.send(job);
 		return c.json({ id, changed: true, completedAt: fields.completedAt ?? item.completedAt });
+	})
+
+	// Sets which project files back this check (photos, certificates, …). The body is the full new set.
+	.put("/:id/files", requireRole("admin"), zv("param", idParam), zv("json", itemFilesUpdate), async (c) => {
+		const db = c.get("db");
+		const user = c.get("user");
+		const { id } = c.req.valid("param");
+		const wanted = [...new Set(c.req.valid("json").fileIds)];
+		const { item, stage } = await loadItem(db, id);
+
+		const [valid, current] = await Promise.all([
+			wanted.length
+				? db
+						.select({ id: files.id, filename: files.filename })
+						.from(files)
+						.where(
+							and(
+								inArray(files.id, wanted),
+								eq(files.projectId, stage.projectId),
+								isNull(files.deletedAt),
+								eq(files.uploadStatus, "uploaded"),
+							),
+						)
+				: Promise.resolve([]),
+			db.select({ fileId: itemFiles.fileId }).from(itemFiles).where(eq(itemFiles.itemId, id)),
+		]);
+		if (valid.length !== wanted.length) throw badRequest("Some of those files aren't in this project");
+
+		const had = new Set(current.map((r) => r.fileId));
+		const added = valid.filter((f) => !had.has(f.id));
+		const removed = current.map((r) => r.fileId).filter((fileId) => !wanted.includes(fileId));
+		if (added.length === 0 && removed.length === 0) return c.json({ id, fileIds: wanted, changed: false });
+
+		const now = Date.now();
+		const meta = { item: item.title, stage: stage.name };
+		const statements: Statement[] = [];
+		if (removed.length) {
+			statements.push(
+				db.delete(itemFiles).where(and(eq(itemFiles.itemId, id), inArray(itemFiles.fileId, removed))),
+				logActivity(
+					db,
+					{
+						projectId: stage.projectId,
+						actorId: user.id,
+						action: "item.files_detached",
+						entityType: "item",
+						entityId: id,
+						meta: { ...meta, count: removed.length },
+					},
+					now,
+				),
+			);
+		}
+		if (added.length) {
+			statements.push(
+				db
+					.insert(itemFiles)
+					.values(added.map((f) => ({ itemId: id, fileId: f.id, attachedBy: user.id, createdAt: now }))),
+				logActivity(
+					db,
+					{
+						projectId: stage.projectId,
+						actorId: user.id,
+						action: "item.files_attached",
+						entityType: "item",
+						entityId: id,
+						meta: { ...meta, count: added.length, file: added[0]?.filename },
+					},
+					now + 1,
+				),
+			);
+		}
+		statements.push(touchProject(db, stage.projectId, now));
+		await runBatch(db, statements);
+		return c.json({ id, fileIds: wanted, changed: true });
 	})
 
 	.delete("/:id", requireRole("admin"), zv("param", idParam), async (c) => {
