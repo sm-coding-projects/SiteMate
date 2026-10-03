@@ -1,3 +1,4 @@
+import { ChevronDown } from "lucide-react";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -30,17 +31,23 @@ function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
 	);
 }
 
-/** Native select: the phone's own picker is the best touch UI there is. */
+/**
+ * Native select: the phone's own picker is the best touch UI there is. The browser's arrow is replaced by
+ * our own chevron (Safari draws its arrow flush against the border). `className` sizes the wrapper.
+ */
 function NativeSelect({ className, ...props }: React.ComponentProps<"select">) {
 	return (
-		<select
-			data-slot="select"
-			className={cn(
-				"h-11 w-full rounded-md border border-input bg-card px-3 text-base outline-none transition-[border-color] duration-[120ms] ease-enter focus-visible:border-foreground disabled:opacity-50",
-				className,
-			)}
-			{...props}
-		/>
+		<span data-slot="select-wrapper" className={cn("relative block w-full", className)}>
+			<select
+				data-slot="select"
+				className="peer h-11 w-full appearance-none truncate rounded-md border border-input bg-card pr-10 pl-3 text-base outline-none transition-[border-color] duration-[120ms] ease-enter focus-visible:border-foreground disabled:opacity-50"
+				{...props}
+			/>
+			<ChevronDown
+				aria-hidden
+				className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground peer-disabled:opacity-50"
+			/>
+		</span>
 	);
 }
 
