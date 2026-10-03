@@ -1,4 +1,4 @@
-# SiteMate — Design
+# BFH App — Design
 
 Build-progress tracker for a Sydney residential builder. Admin users create projects; each project starts
 from a templated NSW workflow that the team fills with documents, quotes, photos and notes.

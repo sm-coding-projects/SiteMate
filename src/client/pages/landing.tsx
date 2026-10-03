@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 /** Optional: where "Request access" emails go. Without it the button explains how invites work. */
 const ACCESS_EMAIL = import.meta.env.VITE_ACCESS_REQUEST_EMAIL as string | undefined;
 const accessHref = ACCESS_EMAIL
-	? `mailto:${ACCESS_EMAIL}?subject=${encodeURIComponent("SiteMate access request")}`
+	? `mailto:${ACCESS_EMAIL}?subject=${encodeURIComponent("BFH App access request")}`
 	: "#request-access";
 
 const WRAP = "mx-auto w-full max-w-[1200px] px-4 md:px-10";
@@ -39,8 +39,19 @@ export function LandingPage() {
 function SignInLink({ className, children = "Sign in" }: { className?: string; children?: ReactNode }) {
 	const { isSignedIn } = useAuth();
 	return (
-		<Link to={isSignedIn ? "/projects" : "/sign-in"} viewTransition className={className}>
-			{isSignedIn ? "Open SiteMate" : children}
+		<Link
+			to={isSignedIn ? "/projects" : "/sign-in"}
+			viewTransition
+			className={className}
+			aria-label={isSignedIn ? "Open BFH App" : undefined}
+		>
+			{isSignedIn ? (
+				<span>
+					Open<span className="hidden sm:inline"> BFH App</span>
+				</span>
+			) : (
+				children
+			)}
 		</Link>
 	);
 }
@@ -48,7 +59,7 @@ function SignInLink({ className, children = "Sign in" }: { className?: string; c
 function TopBar() {
 	return (
 		<header className={cn(WRAP, "flex h-16 items-center justify-between gap-2")}>
-			<Link to="/" aria-label="SiteMate home" className="min-w-0">
+			<Link to="/" aria-label="BFH App home" className="min-w-0">
 				<Wordmark tone="ink" />
 			</Link>
 			<nav aria-label="Site" className="flex items-center gap-1 md:gap-2">
@@ -66,7 +77,11 @@ function TopBar() {
 				</a>
 				<SignInLink className="grid min-h-11 place-items-center rounded-md px-2 text-sm font-medium whitespace-nowrap sm:px-3 transition-colors duration-[120ms] hover:text-hivis" />
 				<Button asChild size="sm">
-					<a href={accessHref}>Request access</a>
+					<a href={accessHref} aria-label="Request access">
+						<span>
+							Request<span className="hidden min-[360px]:inline"> access</span>
+						</span>
+					</a>
 				</Button>
 			</nav>
 		</header>
@@ -267,7 +282,7 @@ function Closing() {
 						Ready when your next slab is.
 					</h2>
 					<p className="mt-4 text-muted-foreground">
-						SiteMate is invite‑only.{" "}
+						BFH App is invite‑only.{" "}
 						{ACCESS_EMAIL
 							? "Request access and we'll set up your workspace."
 							: "Ask the builder running your project to send you an invite to your email address."}

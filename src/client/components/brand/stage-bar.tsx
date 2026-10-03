@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * The 8-segment build bar — SiteMate's signature. Same element in the logo, hero, login card and project card.
+ * The 8-segment build bar — BFH App's signature. Same element in the logo, hero, login card and project card.
  * `current` is 1-based: segments before it are done, it is hi-vis ("you are here"), the rest are to come.
  * `tone` is the surface it sits on: "ink" (dark hero/panels) or "paper" (app surfaces).
  */

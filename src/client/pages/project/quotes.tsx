@@ -87,7 +87,7 @@ export function QuotesTab() {
 			) : q.data.quotes.length === 0 ? (
 				<p className="max-w-[60ch] text-muted-foreground">
 					No confirmed quotes yet. Upload a supplier quote in Documents; once you've checked and confirmed
-					what SiteMate read, it's added here and to the totals.
+					what BFH App read, it's added here and to the totals.
 				</p>
 			) : (
 				<>

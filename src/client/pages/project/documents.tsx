@@ -105,7 +105,7 @@ export function DocumentsTab() {
 			) : docs.length === 0 ? (
 				<p className="text-muted-foreground">
 					No {category ? CATEGORY_LABEL[category]?.toLowerCase() : "document"}s yet.
-					{isAdmin && " Upload a supplier quote as a PDF and SiteMate reads the totals for you to check."}
+					{isAdmin && " Upload a supplier quote as a PDF and BFH App reads the totals for you to check."}
 				</p>
 			) : (
 				<>

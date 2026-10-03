@@ -57,7 +57,7 @@
 		// sandbox: every email goes to EMAIL_SANDBOX_TO (secret) with the intended recipient in the subject.
 		// live: needs a verified Resend domain and an EMAIL_FROM on it.
 		"EMAIL_MODE": "sandbox",
-		"EMAIL_FROM": "SiteMate <onboarding@resend.dev>",
+		"EMAIL_FROM": "BFH App <onboarding@resend.dev>",
 		// Resend free tier allows 100/day; keep headroom.
 		"EMAIL_DAILY_LIMIT": "90"
 	}

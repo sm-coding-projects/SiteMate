@@ -51,7 +51,7 @@ describe("notification email", () => {
 		const [payload, opts] = send.mock.calls[0] ?? [];
 		expect(payload?.to).toBe("owner@example.com");
 		expect(payload?.subject).toBe("[to viewer@example.com] Pre-construction complete — 7 Wattle Rd");
-		expect(payload?.from).toBe("SiteMate <onboarding@resend.dev>");
+		expect(payload?.from).toBe("BFH App <onboarding@resend.dev>");
 		expect(opts).toEqual({ idempotencyKey: `stage_completed:${stageId}:viewer@example.com` });
 		const log = await env.DB.prepare("select status, intended_to, sent_to from email_log").first();
 		expect(log).toEqual({ status: "sent", intended_to: "viewer@example.com", sent_to: "owner@example.com" });
@@ -125,7 +125,7 @@ describe("notification email", () => {
 			{ type: "notify", kind: "test", to: ADMIN.email, requestedBy: ADMIN.id, at: Date.now() },
 			emailEnv(),
 		);
-		expect(send.mock.calls[0]?.[0]?.subject).toBe("[to admin@example.com] SiteMate test email");
+		expect(send.mock.calls[0]?.[0]?.subject).toBe("[to admin@example.com] BFH App test email");
 	});
 
 	it("escapes content in the HTML body", () => {

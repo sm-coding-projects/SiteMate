@@ -59,7 +59,7 @@ export function ReviewInboxPage() {
 		<>
 			<PageHeader
 				title="Review"
-				description="Documents SiteMate has read. Check the details, then confirm — nothing counts towards totals until you do."
+				description="Documents BFH App has read. Check the details, then confirm — nothing counts towards totals until you do."
 			/>
 			<Field id="review-filter" label="Show" className="mb-6 sm:w-64">
 				<NativeSelect id="review-filter" value={status} onChange={(e) => setStatus(e.target.value)}>
@@ -274,7 +274,7 @@ function Failed({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
 	return (
 		<div role="alert" className="rounded-md border bg-card p-5">
 			<p className="flex items-center gap-2 font-medium">
-				<TriangleAlert className="size-5 text-destructive" aria-hidden /> SiteMate couldn't read this document
+				<TriangleAlert className="size-5 text-destructive" aria-hidden /> BFH App couldn't read this document
 			</p>
 			<p className="mt-1 text-sm text-muted-foreground">{e.error ?? "Unknown error"}</p>
 			{isAdmin && (

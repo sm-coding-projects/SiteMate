@@ -40,7 +40,7 @@ export function renderEmail(e: Pick<Email, "heading" | "lines" | "cta">, footer:
 	).join("");
 	const html = `<!doctype html><html><body style="margin:0;background:#f4f5f2;font-family:Arial,Helvetica,sans-serif;color:#0f1214">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto">
-<tr><td style="background:#0f1214;padding:20px 24px"><div style="color:#eef0ec;font-weight:700;font-size:18px;letter-spacing:0.5px">SiteMate</div>
+<tr><td style="background:#0f1214;padding:20px 24px"><div style="color:#eef0ec;font-weight:700;font-size:18px;letter-spacing:0.5px">BFH App</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px"><tr>${bar}</tr></table></td></tr>
 <tr><td style="background:#ffffff;padding:24px;border:1px solid #d9dcd6;border-top:0">
 <h1 style="font-size:20px;margin:0 0 12px">${esc(e.heading)}</h1>
@@ -72,13 +72,13 @@ async function buildEmails(env: Bindings, db: Db, msg: NotifyMessage): Promise<E
 				kind: "test",
 				key: `test:${msg.requestedBy}:${msg.at}`,
 				to: msg.to,
-				subject: "SiteMate test email",
+				subject: "BFH App test email",
 				heading: "Email is working",
 				lines: [
-					"This is a test notification from SiteMate.",
+					"This is a test notification from BFH App.",
 					`Mode: ${(env.EMAIL_MODE || "sandbox") === "live" ? "live" : "sandbox (redirected to the Resend account owner)"}.`,
 				],
-				cta: { label: "Open SiteMate", url: `${app}/projects` },
+				cta: { label: "Open BFH App", url: `${app}/projects` },
 			},
 		];
 	}
@@ -135,7 +135,7 @@ async function buildEmails(env: Bindings, db: Db, msg: NotifyMessage): Promise<E
 		subject: `Ready for review: ${what} — ${row.project}`,
 		heading: `${what} is ready for review`,
 		lines: [
-			`SiteMate read ${row.filename} on ${row.project}.`,
+			`BFH App read ${row.filename} on ${row.project}.`,
 			q?.amountIncGstCents != null ? `Total ${aud(q.amountIncGstCents)} inc GST.` : "",
 			warnings
 				? `${warnings} check${warnings === 1 ? "" : "s"} need a look before you confirm.`
@@ -151,8 +151,8 @@ export async function deliver(env: Bindings, db: Db, emails: Email[]) {
 	const resend = env.RESEND_API_KEY ? new (await import("resend")).Resend(env.RESEND_API_KEY) : null;
 	const limit = Number(env.EMAIL_DAILY_LIMIT || 90);
 	const sandbox = (env.EMAIL_MODE || "sandbox") !== "live";
-	const from = env.EMAIL_FROM || "SiteMate <onboarding@resend.dev>";
-	const footer = "You're getting this because email notifications are on in SiteMate → Account.";
+	const from = env.EMAIL_FROM || "BFH App <onboarding@resend.dev>";
+	const footer = "You're getting this because email notifications are on in BFH App → Account.";
 
 	for (const e of emails) {
 		const log = (

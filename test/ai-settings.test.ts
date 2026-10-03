@@ -108,7 +108,7 @@ describe("AI model settings", () => {
 			method: "POST",
 			body: { protocol: "openai", baseUrl: OPENAI_URL, apiKey: KEY },
 		});
-		// Never 401/403: the SPA would read those as a SiteMate session or permission problem.
+		// Never 401/403: the SPA would read those as a BFH App session or permission problem.
 		expect(bad.status).toBe(400);
 		expect(bad.body.error).toMatch(/API key was rejected: login fail/);
 	});

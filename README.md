@@ -1,4 +1,4 @@
-# SiteMate
+# BFH App
 
 Build-progress tracker for a Sydney residential builder. One Cloudflare Worker serves a React SPA and a Hono API,
 backed by D1, R2, Queues and Workers AI, with Clerk for auth and Resend for email. Everything runs on free tiers.
@@ -89,7 +89,7 @@ In the [Clerk dashboard](https://dashboard.clerk.com) for the development instan
    ```
 3. Make yourself an admin: **Users** → you → **Metadata → Public** → `{ "role": "admin" }`.
 
-After that, invite everyone else from **SiteMate → Team** (Clerk emails the invitation; the role is stored in
+After that, invite everyone else from **BFH App → Team** (Clerk emails the invitation; the role is stored in
 `publicMetadata.role`). Anyone without `"role": "admin"` is a read-only **viewer**. Role changes reach a session
 when its token refreshes (within about a minute).
 
@@ -141,7 +141,7 @@ node scripts/secrets.mjs check   # shows which are set (name + prefix only, neve
 | `ANTHROPIC_MODEL` | `claude-opus-5-5` | Model for the Anthropic provider (native PDF input) |
 | `OPENAI_COMPAT_MODEL` | `openai/gpt-5-mini` | Model for the OpenAI-compatible provider |
 | `EMAIL_MODE` | `sandbox` | `sandbox` redirects to `EMAIL_SANDBOX_TO`; `live` sends to real recipients |
-| `EMAIL_FROM` | `SiteMate <onboarding@resend.dev>` | Sender |
+| `EMAIL_FROM` | `BFH App <onboarding@resend.dev>` | Sender |
 | `EMAIL_DAILY_LIMIT` | `90` | Rolling 24 h cap (Resend free: 100/day) |
 
 `VITE_CLERK_PUBLISHABLE_KEY` goes in `.env`; Vite inlines it at build time.
@@ -234,7 +234,7 @@ All routes are under `/api`. Every write route requires the `admin` role (`requi
 
 ## Free-tier budget
 
-| Service | Free limit | How SiteMate stays under it |
+| Service | Free limit | How BFH App stays under it |
 |---|---|---|
 | Workers | 100k requests/day, 10 ms CPU/request | SPA is static assets; AI, file and email work run in the Queue consumer; files go browser↔R2 directly |
 | D1 | 100k row writes/day | Writes only on user actions; keyset pagination; indexed queries |

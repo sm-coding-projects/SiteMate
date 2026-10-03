@@ -49,7 +49,7 @@ async function endpointFor(env: Bindings, db: Db, input: z.infer<typeof aiModels
 	return { protocol: input.protocol, baseUrl: input.baseUrl, apiKey: saved.endpoint.apiKey };
 }
 
-/** Provider failures are the admin's to fix (wrong URL, key or model), never a SiteMate auth error. */
+/** Provider failures are the admin's to fix (wrong URL, key or model), never a BFH App auth error. */
 function endpointError(err: unknown): never {
 	if (err instanceof EndpointError) {
 		throw new HTTPException(err.status >= 400 && err.status < 500 ? 400 : 502, { message: err.message });
