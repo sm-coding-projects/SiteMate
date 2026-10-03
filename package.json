@@ -17,7 +17,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"r2:cors": "node scripts/r2-cors.mjs",
-		"test:e2e": "playwright test"
+		"test:e2e": "playwright test",
+		"secrets:check": "node scripts/secrets.mjs check"
 	},
 	"dependencies": {
 		"@anthropic-ai/sdk": "^0.131.0",
