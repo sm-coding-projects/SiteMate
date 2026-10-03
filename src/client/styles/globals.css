@@ -4,7 +4,9 @@
  */
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "@fontsource-variable/inter";
+@import "@fontsource-variable/archivo/wdth.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
 
 /* Dark mode: OS preference unless the user picks a theme (data-theme on <html>). */
 @custom-variant dark {
@@ -18,127 +20,194 @@
 	}
 }
 
+/*
+ * "Site Survey" — construction drawings, not SaaS. Cool neutrals, one hi-vis accent.
+ * Hi-vis means "where you are now" (current stage, active nav, primary action) and always carries ink text.
+ * Hi-vis on paper is 1.02:1, so on light surfaces it always gets an ink edge (--primary-edge) and the
+ * focus ring is ink; on dark surfaces hi-vis is the ring.
+ */
 :root {
-	--radius: 0.5rem;
+	--radius: 0.375rem;
 
-	--background: #f8fafc;
-	--foreground: #0f172a;
-	--card: #ffffff;
-	--card-foreground: #0f172a;
-	--popover: #ffffff;
-	--popover-foreground: #0f172a;
-	--primary: #ea580c; /* safety orange */
-	--primary-hover: #c2410c;
-	--primary-foreground: #0b0f14;
-	--secondary: #e2e8f0;
-	--secondary-foreground: #0f172a;
-	--muted: #f1f5f9;
-	--muted-foreground: #475569;
-	--accent: #f1f5f9;
-	--accent-foreground: #0f172a;
+	/* Brand primitives */
+	--paper: #f4f5f2;
+	--surface: #ffffff;
+	--ink: #0f1214;
+	--graphite: #5b6168;
+	--line: #d9dcd6;
+	--hivis: #e8ff3c;
+	--survey: #2e5bff;
+
+	--background: var(--paper);
+	--foreground: var(--ink);
+	--card: var(--surface);
+	--card-foreground: var(--ink);
+	--popover: var(--surface);
+	--popover-foreground: var(--ink);
+	--primary: var(--hivis);
+	--primary-hover: #d6f01f;
+	--primary-foreground: var(--ink);
+	--primary-edge: var(--ink);
+	--secondary: #e9ebe6;
+	--secondary-foreground: var(--ink);
+	--muted: #eceee9;
+	--muted-foreground: var(--graphite);
+	--accent: #eceee9;
+	--accent-foreground: var(--ink);
 	--destructive: #b91c1c;
 	--destructive-foreground: #ffffff;
 	--success: #15803d;
 	--warning: #b45309;
-	--border: #cbd5e1;
-	--input: #64748b;
-	--ring: #0f172a;
+	--border: var(--line);
+	--input: #8a9096;
+	--ring: var(--ink);
+	--link: var(--survey);
 
-	--sidebar: #ffffff;
-	--sidebar-foreground: #0f172a;
-	--sidebar-accent: #f1f5f9;
-	--sidebar-border: #cbd5e1;
+	--sidebar: #fafbf9;
+	--sidebar-foreground: var(--ink);
+	--sidebar-accent: #eceee9;
+	--sidebar-border: var(--line);
 
-	/* Status — always paired with an icon and a label. */
-	--status-not-started: #334155;
-	--status-not-started-bg: #f1f5f9;
-	--status-in-progress: #9a3412;
-	--status-in-progress-bg: #ffedd5;
+	/* Status — always paired with an icon and a label. In progress = "where you are now" = hi-vis. */
+	--status-not-started: #3f454b;
+	--status-not-started-bg: #eceee9;
+	--status-in-progress: var(--ink);
+	--status-in-progress-bg: var(--hivis);
 	--status-complete: #166534;
 	--status-complete-bg: #dcfce7;
-	--status-on-hold: #1e40af;
-	--status-on-hold-bg: #dbeafe;
+	--status-on-hold: #1f3fb8;
+	--status-on-hold-bg: #e3e9ff;
 }
 
+/* Dark is its own palette: sidebar < page < card < popover, each a step lighter. Ink stays ink on hi-vis. */
 @media (prefers-color-scheme: dark) {
 	:root:not([data-theme="light"]) {
-		--background: #020617;
-		--foreground: #f1f5f9;
-		--card: #0f172a;
-		--card-foreground: #f1f5f9;
-		--popover: #0f172a;
-		--popover-foreground: #f1f5f9;
-		--primary: #f97316;
-		--primary-hover: #fb923c;
-		--primary-foreground: #0b0f14;
-		--secondary: #1e293b;
-		--secondary-foreground: #f1f5f9;
-		--muted: #1e293b;
-		--muted-foreground: #94a3b8;
-		--accent: #1e293b;
-		--accent-foreground: #f1f5f9;
+		--paper: #0f1214;
+		--surface: #171b1e;
+		--graphite: #9aa1a8;
+		--line: #2a2f33;
+		--survey: #7b93ff;
+		--background: #0f1214;
+		--foreground: #eef0ec;
+		--card: #171b1e;
+		--card-foreground: #eef0ec;
+		--popover: #1e2327;
+		--popover-foreground: #eef0ec;
+		--primary-hover: #f1ff80;
+		--primary-edge: var(--hivis);
+		--secondary: #22272b;
+		--secondary-foreground: #eef0ec;
+		--muted: #1e2327;
+		--accent: #22272b;
+		--accent-foreground: #eef0ec;
 		--destructive: #f87171;
-		--destructive-foreground: #0b0f14;
+		--destructive-foreground: #0f1214;
 		--success: #4ade80;
 		--warning: #fbbf24;
-		--border: #334155;
-		--input: #64748b;
-		--ring: #fdba74;
-		--sidebar: #0f172a;
-		--sidebar-foreground: #f1f5f9;
-		--sidebar-accent: #1e293b;
-		--sidebar-border: #334155;
-		--status-not-started: #cbd5e1;
-		--status-not-started-bg: #1e293b;
-		--status-in-progress: #fdba74;
-		--status-in-progress-bg: #431407;
+		--input: #737a81;
+		--ring: var(--hivis);
+		--sidebar: #0b0d0f;
+		--sidebar-foreground: #eef0ec;
+		--sidebar-accent: #171b1e;
+		--sidebar-border: #1e2327;
+		--status-not-started: #cfd3d7;
+		--status-not-started-bg: #22272b;
 		--status-complete: #86efac;
 		--status-complete-bg: #052e16;
-		--status-on-hold: #93c5fd;
-		--status-on-hold-bg: #172554;
+		--status-on-hold: #a9b8ff;
+		--status-on-hold-bg: #17204a;
 	}
 }
 
 :root[data-theme="dark"] {
-	--background: #020617;
-	--foreground: #f1f5f9;
-	--card: #0f172a;
-	--card-foreground: #f1f5f9;
-	--popover: #0f172a;
-	--popover-foreground: #f1f5f9;
-	--primary: #f97316;
-	--primary-hover: #fb923c;
-	--primary-foreground: #0b0f14;
-	--secondary: #1e293b;
-	--secondary-foreground: #f1f5f9;
-	--muted: #1e293b;
-	--muted-foreground: #94a3b8;
-	--accent: #1e293b;
-	--accent-foreground: #f1f5f9;
+	--paper: #0f1214;
+	--surface: #171b1e;
+	--graphite: #9aa1a8;
+	--line: #2a2f33;
+	--survey: #7b93ff;
+	--background: #0f1214;
+	--foreground: #eef0ec;
+	--card: #171b1e;
+	--card-foreground: #eef0ec;
+	--popover: #1e2327;
+	--popover-foreground: #eef0ec;
+	--primary-hover: #f1ff80;
+	--primary-edge: var(--hivis);
+	--secondary: #22272b;
+	--secondary-foreground: #eef0ec;
+	--muted: #1e2327;
+	--accent: #22272b;
+	--accent-foreground: #eef0ec;
 	--destructive: #f87171;
-	--destructive-foreground: #0b0f14;
+	--destructive-foreground: #0f1214;
 	--success: #4ade80;
 	--warning: #fbbf24;
-	--border: #334155;
-	--input: #64748b;
-	--ring: #fdba74;
-	--sidebar: #0f172a;
-	--sidebar-foreground: #f1f5f9;
-	--sidebar-accent: #1e293b;
-	--sidebar-border: #334155;
-	--status-not-started: #cbd5e1;
-	--status-not-started-bg: #1e293b;
-	--status-in-progress: #fdba74;
-	--status-in-progress-bg: #431407;
+	--input: #737a81;
+	--ring: var(--hivis);
+	--sidebar: #0b0d0f;
+	--sidebar-foreground: #eef0ec;
+	--sidebar-accent: #171b1e;
+	--sidebar-border: #1e2327;
+	--status-not-started: #cfd3d7;
+	--status-not-started-bg: #22272b;
 	--status-complete: #86efac;
 	--status-complete-bg: #052e16;
-	--status-on-hold: #93c5fd;
-	--status-on-hold-bg: #172554;
+	--status-on-hold: #a9b8ff;
+	--status-on-hold-bg: #17204a;
+}
+
+/* An always-dark island (landing hero, login drawing panel) regardless of the app theme. */
+.theme-ink {
+	--paper: #0f1214;
+	--surface: #171b1e;
+	--graphite: #9aa1a8;
+	--line: #2a2f33;
+	--survey: #7b93ff;
+	--background: #0f1214;
+	--foreground: #eef0ec;
+	--card: #171b1e;
+	--card-foreground: #eef0ec;
+	--popover: #1e2327;
+	--popover-foreground: #eef0ec;
+	--primary-hover: #f1ff80;
+	--primary-edge: var(--hivis);
+	--secondary: #22272b;
+	--secondary-foreground: #eef0ec;
+	--muted: #1e2327;
+	--accent: #22272b;
+	--accent-foreground: #eef0ec;
+	--destructive: #f87171;
+	--destructive-foreground: #0f1214;
+	--success: #4ade80;
+	--warning: #fbbf24;
+	--input: #737a81;
+	--ring: var(--hivis);
+	--sidebar: #0b0d0f;
+	--sidebar-foreground: #eef0ec;
+	--sidebar-accent: #171b1e;
+	--sidebar-border: #1e2327;
+	--status-not-started: #cfd3d7;
+	--status-not-started-bg: #22272b;
+	--status-complete: #86efac;
+	--status-complete-bg: #052e16;
+	--status-on-hold: #a9b8ff;
+	--status-on-hold-bg: #17204a;
+	color-scheme: dark;
+	background-color: var(--background);
+	color: var(--foreground);
 }
 
 @theme inline {
-	--font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
-	--font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+	--font-sans: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+	--font-heading: "Archivo Variable", ui-sans-serif, system-ui, sans-serif;
+	--font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+	/* Motion: enter decelerates, exit accelerates. No bounce. */
+	--ease-enter: cubic-bezier(0.2, 0, 0, 1);
+	--ease-exit: cubic-bezier(0.4, 0, 1, 1);
+	--animate-page-in: page-in 320ms var(--ease-enter) both;
+	--animate-row-in: row-in 320ms var(--ease-enter) both;
+	--animate-hivis-pulse: hivis-pulse 2.4s var(--ease-enter) infinite;
 
 	--radius-sm: calc(var(--radius) - 2px);
 	--radius-md: var(--radius);
@@ -154,6 +223,11 @@
 	--color-primary: var(--primary);
 	--color-primary-hover: var(--primary-hover);
 	--color-primary-foreground: var(--primary-foreground);
+	--color-primary-edge: var(--primary-edge);
+	--color-ink: var(--ink);
+	--color-hivis: var(--hivis);
+	--color-survey: var(--survey);
+	--color-link: var(--link);
 	--color-secondary: var(--secondary);
 	--color-secondary-foreground: var(--secondary-foreground);
 	--color-muted: var(--muted);
@@ -207,6 +281,18 @@
 	a[href] {
 		cursor: pointer;
 	}
+	/* Headings: Archivo semi-expanded — signage, not template. */
+	h1,
+	h2,
+	h3 {
+		@apply font-heading tracking-tight;
+		font-stretch: 112.5%;
+		text-wrap: balance;
+	}
+	/* One line weight for every icon. CSS beats Lucide's stroke-width attribute. */
+	.lucide {
+		stroke-width: 1.25;
+	}
 	:focus-visible {
 		outline: 2px solid var(--ring);
 		outline-offset: 2px;
@@ -214,6 +300,83 @@
 	.tabular {
 		font-variant-numeric: tabular-nums;
 	}
+}
+
+@layer utilities {
+	/* Drawing-set data label: STAGE 04/08 · FRAME, 11/30, 09:42 */
+	.label-mono {
+		font-family: var(--font-mono);
+		font-size: 0.8125rem;
+		font-weight: 500;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		font-variant-numeric: tabular-nums;
+	}
+	.stretch-semi {
+		font-stretch: 112.5%;
+	}
+	.stretch-expanded {
+		font-stretch: 125%;
+	}
+	/* Faint 8px survey grid, with a stronger line every 64px. Set --grid-color to suit the surface. */
+	.bg-grid {
+		--grid-color: color-mix(in srgb, currentColor 7%, transparent);
+		background-image:
+			linear-gradient(var(--grid-color) 1px, transparent 1px),
+			linear-gradient(90deg, var(--grid-color) 1px, transparent 1px),
+			linear-gradient(color-mix(in srgb, var(--grid-color) 50%, transparent) 1px, transparent 1px),
+			linear-gradient(90deg, color-mix(in srgb, var(--grid-color) 50%, transparent) 1px, transparent 1px);
+		background-size:
+			64px 64px,
+			64px 64px,
+			8px 8px,
+			8px 8px;
+	}
+	/* Diagonal hatching — the drawing convention for "to be supplied". */
+	.bg-hatch {
+		background-image: repeating-linear-gradient(
+			-45deg,
+			color-mix(in srgb, currentColor 22%, transparent) 0 1px,
+			transparent 1px 6px
+		);
+	}
+	/* Self-drawing strokes: give the shape pathLength="1"; toggle data-drawn. */
+	.draw {
+		stroke-dasharray: 1;
+		stroke-dashoffset: 1;
+		transition: stroke-dashoffset 800ms var(--ease-enter);
+	}
+	.draw[data-drawn="true"] {
+		stroke-dashoffset: 0;
+	}
+}
+
+@keyframes page-in {
+	from {
+		opacity: 0;
+		transform: translateY(8px);
+	}
+}
+@keyframes row-in {
+	from {
+		opacity: 0;
+		transform: translateY(-8px);
+	}
+}
+@keyframes hivis-pulse {
+	0% {
+		box-shadow: 0 0 0 0 color-mix(in srgb, var(--hivis) 70%, transparent);
+	}
+	70%,
+	100% {
+		box-shadow: 0 0 0 8px transparent;
+	}
+}
+
+/* Hero bar → login card edge (View Transitions API; no-op where unsupported). */
+::view-transition-group(stage-bar) {
+	animation-duration: 600ms;
+	animation-timing-function: var(--ease-enter);
 }
 
 /* !important is deliberate: reduced motion must beat any component transition. */
@@ -229,5 +392,10 @@
 		transition-duration: 0.01ms !important;
 		/* biome-ignore lint/complexity/noImportantStyles: reduced-motion override */
 		scroll-behavior: auto !important;
+	}
+	::view-transition-group(*),
+	::view-transition-old(*),
+	::view-transition-new(*) {
+		animation: none;
 	}
 }

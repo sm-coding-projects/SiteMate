@@ -11,6 +11,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ApiRequestError } from "@/lib/api";
 import { AccountPage } from "@/pages/account";
 import { ActivityPage } from "@/pages/activity";
+import { LandingPage } from "@/pages/landing";
 import { ProjectsPage } from "@/pages/projects";
 import { SetupRequired } from "@/pages/setup-required";
 import { SignInPage } from "@/pages/sign-in";
@@ -29,6 +30,7 @@ const queryClient = new QueryClient({
 });
 
 const router = createBrowserRouter([
+	{ path: "/", element: <LandingPage />, errorElement: <RouteError /> },
 	{ path: "/sign-in/*", element: <SignInPage />, errorElement: <RouteError /> },
 	{
 		element: <RequireAuth />,
@@ -38,7 +40,6 @@ const router = createBrowserRouter([
 				element: <AppShell />,
 				errorElement: <RouteError />,
 				children: [
-					{ index: true, element: <Navigate to="/projects" replace /> },
 					{ path: "projects", element: <ProjectsPage /> },
 					{ path: "activity", element: <ActivityPage /> },
 					{ path: "account", element: <AccountPage /> },
@@ -66,7 +67,18 @@ createRoot(root).render(
 			<ClerkProvider
 				publishableKey={publishableKey}
 				signInUrl="/sign-in"
-				afterSignOutUrl="/sign-in"
+				afterSignOutUrl="/"
+				localization={{
+					signIn: {
+						start: {
+							title: "Sign in to your sites",
+							titleCombined: "Sign in to your sites",
+							// Invite note lives in the card (Clerk renders button + footer as one unit, so it can't go between).
+							subtitle: "Invite only. Use the email your builder invited.",
+							subtitleCombined: "Invite only. Use the email your builder invited.",
+						},
+					},
+				}}
 				routerPush={(to) => router.navigate(to)}
 				routerReplace={(to) => router.navigate(to, { replace: true })}
 			>
