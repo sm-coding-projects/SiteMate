@@ -6,6 +6,7 @@ import {
 	useQuery,
 	useQueryClient,
 } from "@tanstack/react-query";
+import { useCallback } from "react";
 import type {
 	ActivityEntry,
 	ExtractionDetail,
@@ -294,18 +295,28 @@ export function useActivity(projectId?: string) {
 
 // ── Files ────────────────────────────────────────────────────────────────────
 
-export function useFiles(projectId: string, kind: "photos" | "documents") {
+export function useFiles(
+	projectId: string,
+	kind: "photos" | "documents",
+	filters: { stageId?: string; category?: string } = {},
+) {
 	const api = useApi();
 	return useInfiniteQuery({
-		queryKey: ["project", projectId, "files", kind],
-		...infinite<FileEntry>(api, (cursor) => `/projects/${projectId}/files${qs({ kind, cursor, limit: 30 })}`),
+		queryKey: ["project", projectId, "files", kind, filters],
+		...infinite<FileEntry>(
+			api,
+			(cursor) => `/projects/${projectId}/files${qs({ kind, ...filters, cursor, limit: 30 })}`,
+		),
 	});
 }
 
 export function useFileUrl() {
 	const api = useApi();
-	return (fileId: string, download = false) =>
-		api<SignedUrl>(`/files/${fileId}/url${download ? "?download=1" : ""}`);
+	return useCallback(
+		(fileId: string, download = false) =>
+			api<SignedUrl>(`/files/${fileId}/url${download ? "?download=1" : ""}`),
+		[api],
+	);
 }
 
 export const useUpdateFile = (projectId: string) =>

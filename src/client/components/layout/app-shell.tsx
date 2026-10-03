@@ -1,5 +1,6 @@
 import { NavLink, Outlet, useLocation } from "react-router";
 import { Wordmark } from "@/components/brand/wordmark";
+import { UploadTray } from "@/components/upload-tray";
 import { cn } from "@/lib/utils";
 import { ICON_PROPS, NAV } from "./nav";
 import { MobileUserMenu, SidebarUser } from "./user-menu";
@@ -70,6 +71,8 @@ export function AppShell() {
 					</div>
 				</main>
 			</div>
+
+			<UploadTray />
 
 			{/* Mobile bottom tab bar */}
 			<nav

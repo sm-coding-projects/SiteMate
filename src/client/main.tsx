@@ -13,8 +13,10 @@ import { AccountPage } from "@/pages/account";
 import { ActivityPage } from "@/pages/activity";
 import { LandingPage } from "@/pages/landing";
 import { ProjectActivityTab } from "@/pages/project/activity";
+import { DocumentsTab } from "@/pages/project/documents";
 import { ProjectLayout } from "@/pages/project/layout";
 import { NotesTab } from "@/pages/project/notes";
+import { PhotosTab } from "@/pages/project/photos";
 import { StagesTab } from "@/pages/project/stages";
 import { ProjectsPage } from "@/pages/projects";
 import { SetupRequired } from "@/pages/setup-required";
@@ -51,6 +53,8 @@ const router = createBrowserRouter([
 						errorElement: <RouteError />,
 						children: [
 							{ index: true, element: <StagesTab />, errorElement: <RouteError /> },
+							{ path: "photos", element: <PhotosTab />, errorElement: <RouteError /> },
+							{ path: "documents", element: <DocumentsTab />, errorElement: <RouteError /> },
 							{ path: "notes", element: <NotesTab />, errorElement: <RouteError /> },
 							{ path: "activity", element: <ProjectActivityTab />, errorElement: <RouteError /> },
 						],

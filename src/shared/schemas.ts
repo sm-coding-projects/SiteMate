@@ -162,6 +162,7 @@ export const DOCUMENT_MIME_TYPES = [
 
 export const fileListQuery = z.object({
 	kind: z.enum(["photos", "documents"]).default("photos"),
+	category: z.enum(FILE_CATEGORIES).optional(),
 	stageId: idSchema.optional(),
 	cursor: z.string().max(100).optional(),
 	limit: limitParam,
@@ -183,6 +184,8 @@ export const fileCreate = z
 		/** Browser made a WebP thumbnail and will PUT it too. */
 		withThumb: z.boolean().default(false),
 		thumbBytes: z.number().int().positive().max(MAX_THUMB_BYTES).optional(),
+		/** WebP where the browser can encode it (Safari < 17 can't), else JPEG. */
+		thumbMimeType: z.enum(["image/webp", "image/jpeg"]).default("image/webp"),
 	})
 	.superRefine((f, ctx) => {
 		const isPhoto = f.category === "photo";
@@ -207,6 +210,14 @@ export const fileCreate = z
 		}
 	});
 export type FileCreate = z.input<typeof fileCreate>;
+
+/** Re-issue upload URLs for a pending file (the 5-minute ticket expired on a slow connection). */
+export const uploadUrlsBody = z.object({
+	thumbBytes: z.number().int().positive().max(MAX_THUMB_BYTES).optional(),
+	thumbMimeType: z.enum(["image/webp", "image/jpeg"]).default("image/webp"),
+});
+
+export const fileUrlQuery = z.object({ download: z.enum(["1", "0"]).optional() });
 
 export const fileUpdate = z
 	.object({
