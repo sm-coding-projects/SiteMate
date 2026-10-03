@@ -46,6 +46,7 @@ async function writeRoutes() {
 		["PATCH", `/admin/users/${ADMIN.id}/role`, { role: "viewer" }],
 		["POST", `/admin/users/${ADMIN.id}/remove-access`, undefined],
 		["POST", `/admin/users/${ADMIN.id}/restore-access`, undefined],
+		["DELETE", `/admin/users/${ADMIN.id}`, undefined],
 	] as const;
 }
 
@@ -145,6 +146,39 @@ describe("team management (admin)", () => {
 			.bind(VIEWER.id)
 			.all<{ action: string }>();
 		expect(log.results.map((r) => r.action)).toEqual(["user.access_removed", "user.access_restored"]);
+	});
+
+	it("permanently deletes viewers only, and blocks their old session", async () => {
+		await api("/me", { as: VIEWER });
+		const asClerkUser = (role: string, email: string) =>
+			({
+				publicMetadata: { role },
+				primaryEmailAddress: { emailAddress: email },
+				emailAddresses: [],
+			}) as never;
+
+		fakeClerk.users.getUser.mockResolvedValueOnce(asClerkUser("admin", "other.admin@example.com"));
+		const admin = await api<{ error: string }>("/admin/users/user_other_admin", {
+			as: ADMIN,
+			method: "DELETE",
+		});
+		expect(admin.status).toBe(400);
+		expect(admin.body.error).toMatch(/only viewers/i);
+		expect(fakeClerk.users.deleteUser).not.toHaveBeenCalled();
+
+		expect((await api(`/admin/users/${ADMIN.id}`, { as: ADMIN, method: "DELETE" })).status).toBe(400);
+
+		fakeClerk.users.getUser.mockResolvedValueOnce(asClerkUser("viewer", VIEWER.email));
+		const res = await api(`/admin/users/${VIEWER.id}`, { as: ADMIN, method: "DELETE" });
+		expect(res.status).toBe(200);
+		expect(fakeClerk.users.deleteUser).toHaveBeenCalledWith(VIEWER.id);
+		expect((await api("/projects", { as: VIEWER })).status).toBe(403);
+		const log = await env.DB.prepare("select meta from activity where action = 'user.deleted'").first<{
+			meta: string;
+		}>();
+		expect(JSON.parse(log?.meta ?? "{}")).toEqual({ email: VIEWER.email });
+
+		await env.DB.prepare("update users set access_revoked_at = null where id = ?").bind(VIEWER.id).run();
 	});
 
 	it("changes roles but never lets an admin demote themselves", async () => {

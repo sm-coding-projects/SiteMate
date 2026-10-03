@@ -1,4 +1,4 @@
-import { MailPlus, UserCheck, UserX, X } from "lucide-react";
+import { EllipsisVertical, MailPlus, Trash2, UserCheck, UserX, X } from "lucide-react";
 import { type FormEvent, useState } from "react";
 import { Navigate } from "react-router";
 import { ConfirmDialog } from "@/components/confirm-dialog";
@@ -17,6 +17,13 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Field, Input, NativeSelect } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTeam, useTeamMutation } from "@/hooks/use-data";
@@ -43,6 +50,8 @@ export function TeamPage() {
 		api(`/admin/users/${id}/${remove ? "remove-access" : "restore-access"}`, { method: "POST" }),
 	);
 	const [removing, setRemoving] = useState<TeamMember | null>(null);
+	const del = useTeamMutation((api, id: string) => api(`/admin/users/${id}`, { method: "DELETE" }));
+	const [deleting, setDeleting] = useState<TeamMember | null>(null);
 
 	if (isPending) return <Skeleton className="h-64" />;
 	if (me?.role !== "admin") return <Navigate to="/projects" replace />;
@@ -70,6 +79,19 @@ export function TeamPage() {
 				onConfirm={() => {
 					if (!removing) return;
 					access.mutate({ id: removing.id, remove: true }, { onSuccess: () => setRemoving(null) });
+				}}
+			/>
+			<ConfirmDialog
+				open={deleting !== null}
+				onOpenChange={(o) => !o && setDeleting(null)}
+				title={`Delete ${deleting?.name ?? deleting?.email ?? ""} permanently?`}
+				description="Their account is deleted and they're signed out within a minute. This can't be undone: to bring them back, send a new invitation. Their name stays on past activity."
+				confirmLabel="Delete permanently"
+				destructive
+				pending={del.isPending}
+				onConfirm={() => {
+					if (!deleting) return;
+					del.mutate(deleting.id, { onSuccess: () => setDeleting(null) });
 				}}
 			/>
 
@@ -104,11 +126,13 @@ export function TeamPage() {
 									isMe={m.id === me.id}
 									pending={
 										(setRole.isPending && setRole.variables?.id === m.id) ||
-										(access.isPending && access.variables?.id === m.id)
+										(access.isPending && access.variables?.id === m.id) ||
+										(del.isPending && del.variables === m.id)
 									}
 									onRole={(role) => setRole.mutate({ id: m.id, role })}
 									onRemove={() => setRemoving(m)}
 									onRestore={() => access.mutate({ id: m.id, remove: false })}
+									onDelete={() => setDeleting(m)}
 								/>
 							))}
 						</ul>
@@ -116,6 +140,7 @@ export function TeamPage() {
 							<p className="mt-2 text-sm text-destructive">{errorMessage(setRole.error)}</p>
 						)}
 						{access.isError && <p className="mt-2 text-sm text-destructive">{errorMessage(access.error)}</p>}
+						{del.isError && <p className="mt-2 text-sm text-destructive">{errorMessage(del.error)}</p>}
 						<p className="mt-2 text-sm text-muted-foreground">
 							Role changes reach the person's session within about a minute.
 						</p>
@@ -164,6 +189,7 @@ function MemberRow({
 	onRole,
 	onRemove,
 	onRestore,
+	onDelete,
 }: {
 	member: TeamMember;
 	isMe: boolean;
@@ -171,6 +197,7 @@ function MemberRow({
 	onRole: (role: Role) => void;
 	onRemove: () => void;
 	onRestore: () => void;
+	onDelete: () => void;
 }) {
 	const removed = member.accessRemoved;
 	return (
@@ -181,7 +208,7 @@ function MemberRow({
 					{initials(member.name, member.email)}
 				</AvatarFallback>
 			</Avatar>
-			<span className="min-w-0 flex-1">
+			<span className="min-w-0 flex-[1_1_12rem]">
 				<span className="block truncate font-medium">
 					{member.name ?? member.email}
 					{isMe && <span className="text-muted-foreground"> (you)</span>}
@@ -202,7 +229,7 @@ function MemberRow({
 			</span>
 			<NativeSelect
 				aria-label={`Role for ${member.name ?? member.email}`}
-				className="w-32"
+				className="ml-auto w-32"
 				value={member.role}
 				disabled={isMe || removed || pending}
 				title={isMe ? "You can't change your own role" : undefined}
@@ -211,23 +238,39 @@ function MemberRow({
 				<option value="admin">Admin</option>
 				<option value="viewer">Viewer</option>
 			</NativeSelect>
-			{removed ? (
-				<Button variant="outline" size="sm" className="ml-auto" disabled={pending} onClick={onRestore}>
-					<UserCheck aria-hidden /> Restore access
-				</Button>
-			) : (
-				!isMe && (
-					<Button
-						variant="ghost"
-						size="sm"
-						className="ml-auto"
-						disabled={pending}
-						onClick={onRemove}
-						aria-label={`Remove access for ${member.name ?? member.email}`}
-					>
-						<UserX aria-hidden /> Remove access
-					</Button>
-				)
+			{!isMe && (
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button
+							variant="ghost"
+							size="icon"
+							disabled={pending}
+							aria-label={`Actions for ${member.name ?? member.email}`}
+						>
+							<EllipsisVertical aria-hidden />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align="end" className="w-56">
+						{removed ? (
+							<DropdownMenuItem className="min-h-11" onSelect={onRestore}>
+								<UserCheck aria-hidden /> Restore access
+							</DropdownMenuItem>
+						) : (
+							<DropdownMenuItem className="min-h-11" onSelect={onRemove}>
+								<UserX aria-hidden /> Remove access
+							</DropdownMenuItem>
+						)}
+						{/* Admins can only be deactivated; demote to viewer first to delete. */}
+						{member.role === "viewer" && (
+							<>
+								<DropdownMenuSeparator />
+								<DropdownMenuItem className="min-h-11 text-destructive" onSelect={onDelete}>
+									<Trash2 aria-hidden /> Delete permanently
+								</DropdownMenuItem>
+							</>
+						)}
+					</DropdownMenuContent>
+				</DropdownMenu>
 			)}
 		</li>
 	);

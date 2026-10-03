@@ -173,6 +173,36 @@ export const adminRoutes = new Hono<AppEnv>()
 		return c.json({ id, accessRemoved: false });
 	})
 
+	/**
+	 * Viewers only (admins can only have their access removed). Deletes the Clerk user, which frees the email
+	 * for a new invitation. The `users` row stays, revoked, because notes, files and activity point at it; it
+	 * also refuses a session token issued before the delete.
+	 */
+	.delete("/users/:id", zv("param", userParam), async (c) => {
+		const me = c.get("user");
+		const { id } = c.req.valid("param");
+		if (id === me.id) throw badRequest("You can't delete your own account. Ask another admin.");
+		const clerk = c.get("clerk");
+		const target = await clerk.users.getUser(id).catch(clerkError);
+		if (toRole(target.publicMetadata?.role) !== "viewer") {
+			throw badRequest("Only viewers can be deleted. Remove an admin's access instead.");
+		}
+		await clerk.users.deleteUser(id).catch(clerkError);
+		const db = c.get("db");
+		const now = Date.now();
+		await db.batch([
+			db.update(users).set({ accessRevokedAt: now, updatedAt: now }).where(eq(users.id, id)),
+			logActivity(db, {
+				actorId: me.id,
+				action: "user.deleted",
+				entityType: "user",
+				entityId: id,
+				meta: { email: emailOf(target) },
+			}),
+		]);
+		return c.json({ id, deleted: true });
+	})
+
 	.patch("/users/:id/role", zv("param", userParam), zv("json", roleUpdate), async (c) => {
 		const me = c.get("user");
 		const { id } = c.req.valid("param");

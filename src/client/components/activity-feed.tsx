@@ -140,6 +140,9 @@ export function describeActivity(e: ActivityEntry): { kind: ActivityKind; tag: s
 		case "user.access_restored":
 			what = `restored access for ${str(m.email)}`;
 			break;
+		case "user.deleted":
+			what = `deleted ${str(m.email)}'s account`;
+			break;
 		case "ai.model_changed":
 			what = m.host
 				? `switched the AI model to ${str(m.model)} (${str(m.host)})`
