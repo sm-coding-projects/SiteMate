@@ -284,6 +284,37 @@ export interface Team {
 	invitations: TeamInvitation[];
 }
 
+// ── AI model ─────────────────────────────────────────────────────────────────
+
+export type AiProtocol = "openai" | "anthropic";
+
+/** GET /admin/ai. The API key itself never leaves the Worker; `keyHint` is its last 4 characters. */
+export interface AiSettings {
+	/** What every AI call uses right now. */
+	active: { provider: string; model: string; custom: boolean };
+	custom: {
+		protocol: AiProtocol;
+		baseUrl: string;
+		model: string;
+		keyHint: string;
+		updatedAt: number;
+	} | null;
+	/** False until the SETTINGS_ENCRYPTION_KEY secret is set; keys can't be saved without it. */
+	canStoreKeys: boolean;
+}
+
+export interface AiModel {
+	id: string;
+	name: string | null;
+}
+
+export interface AiTestResult {
+	ok: true;
+	model: string;
+	latencyMs: number;
+	reply: string;
+}
+
 // ── Queue ────────────────────────────────────────────────────────────────────
 
 /** Messages carried on the `sitemate-jobs` queue. */

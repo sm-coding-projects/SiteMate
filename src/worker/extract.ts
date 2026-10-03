@@ -19,7 +19,7 @@ import {
 	quoteResult,
 	quoteSchema,
 } from "./ai/prompts";
-import { selectProvider } from "./ai/providers";
+import { resolveProvider } from "./ai/providers";
 import { createDb, type Db } from "./db";
 import type { Bindings } from "./types";
 
@@ -48,7 +48,7 @@ export async function runExtraction(env: Bindings, extractionId: string, attempt
 	if (row.ex.status === "confirmed") return; // a reviewer already confirmed it; never overwrite
 	const { file } = row;
 
-	const provider = selectProvider(env);
+	const provider = await resolveProvider(env, db);
 	await db
 		.update(documentExtractions)
 		.set({

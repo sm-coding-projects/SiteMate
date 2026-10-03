@@ -74,6 +74,16 @@ export function installApi(page: Page, role: "admin" | "viewer", opts: { slowIte
 			const url = new URL(route.request().url());
 			const path = url.pathname.replace(/^\/api/, "");
 			const method = route.request().method();
+			if (role === "admin" && path === "/admin/ai/models")
+				return json(route, {
+					models: [
+						{ id: "MiniMax-M2.7", name: null },
+						{ id: "MiniMax-M3", name: null },
+						{ id: "MiniMax-M3.1-Flash-Preview", name: null },
+					],
+				});
+			if (role === "admin" && path === "/admin/ai/test")
+				return json(route, { ok: true, model: "MiniMax-M3", latencyMs: 2300, reply: "OK" });
 			if (method !== "GET") {
 				writes.push(`${method} ${path}`);
 				if (role === "viewer") return json(route, { error: "Requires admin role" }, 403);
@@ -386,6 +396,12 @@ export function installApi(page: Page, role: "admin" | "viewer", opts: { slowIte
 							createdAt: NOW - DAY,
 						},
 					],
+				});
+			if (path === "/admin/ai")
+				return json(route, {
+					active: { provider: "workers-ai", model: "@cf/meta/llama-4-scout-17b-16e-instruct", custom: false },
+					custom: null,
+					canStoreKeys: true,
 				});
 			if (path === "/admin/email-log")
 				return json(route, { sentLast24h: 3, limit: 90, mode: "sandbox", configured: true, items: [] });

@@ -5,6 +5,7 @@ import { createDb } from "./db";
 import { clerk, requireUser } from "./middleware/auth";
 import { handleQueue } from "./queue";
 import { adminRoutes } from "./routes/admin";
+import { aiSettingsRoutes } from "./routes/ai-settings";
 import { extractionRoutes, projectQuoteRoutes, quoteRoutes, supplierRoutes } from "./routes/extractions";
 import { fileRoutes, projectFileRoutes } from "./routes/files";
 import { meRoutes } from "./routes/me";
@@ -26,6 +27,7 @@ app.get("/health", (c) => c.json({ ok: true, env: c.env.APP_ENV, time: Date.now(
 // Everything below requires a signed-in user.
 app.use(clerk(), requireUser());
 app.route("/me", meRoutes);
+app.route("/admin/ai", aiSettingsRoutes);
 app.route("/admin", adminRoutes);
 app.route("/templates", templateRoutes);
 app.route("/projects", projectRoutes);

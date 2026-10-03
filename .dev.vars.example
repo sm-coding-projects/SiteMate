@@ -36,3 +36,7 @@ EMAIL_SANDBOX_TO=you@example.com
 # OPENAI_COMPAT_BASE_URL=https://openrouter.ai/api/v1
 # Only if the AI Gateway has "Authenticated Gateway" turned on.
 # AI_GATEWAY_TOKEN=xxx
+
+# Encrypts the API key an admin saves under Account → AI model (32 random bytes): openssl rand -base64 32
+# Changing it later makes the saved key unreadable; re-enter the key in the app.
+# SETTINGS_ENCRYPTION_KEY=xxx

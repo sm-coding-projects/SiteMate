@@ -25,6 +25,8 @@ export default defineConfig(async () => {
 						R2_ACCESS_KEY_ID: "test-access-key",
 						R2_SECRET_ACCESS_KEY: "test-secret-key",
 						EMAIL_SANDBOX_TO: "owner@example.com",
+						// 32 zero bytes: tests only.
+						SETTINGS_ENCRYPTION_KEY: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
 					},
 				},
 			}),

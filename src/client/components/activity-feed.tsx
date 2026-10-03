@@ -125,6 +125,11 @@ export function describeActivity(e: ActivityEntry): { kind: ActivityKind; tag: s
 		case "user.role_changed":
 			what = `made ${str(m.email)} ${m.role === "admin" ? "an admin" : "a viewer"}`;
 			break;
+		case "ai.model_changed":
+			what = m.host
+				? `switched the AI model to ${str(m.model)} (${str(m.host)})`
+				: `switched the AI model back to the default (${str(m.model)})`;
+			break;
 		default:
 			what = e.action.replace(/[._]/g, " ");
 	}
