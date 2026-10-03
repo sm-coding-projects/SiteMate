@@ -1,4 +1,4 @@
-# SiteMate — Design System
+# BFH App — Design System
 
 Summary of the visual system. The full spec is [`design-system/sitemate/MASTER.md`](../design-system/sitemate/MASTER.md);
 tokens are in [`src/client/styles/globals.css`](../src/client/styles/globals.css). Last reviewed 2026-10-03.

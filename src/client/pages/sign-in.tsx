@@ -41,7 +41,7 @@ const CLERK_APPEARANCE = {
 };
 
 /**
- * Sign-in only: SiteMate is invite-only, so there is no sign-up route.
+ * Sign-in only: BFH App is invite-only, so there is no sign-up route.
  * Clerk is flattened into our own card so the 8-segment bar can sit on its top edge
  * (and morph in from the landing hero via the View Transitions API).
  */
@@ -49,7 +49,7 @@ export function SignInPage({ mode = "sign-in" }: { mode?: "sign-in" | "sign-up" 
 	return (
 		<div className="grid min-h-dvh lg:grid-cols-[minmax(0,1fr)_minmax(0,1.25fr)]">
 			<main className="flex flex-col px-4 py-6 md:px-10">
-				<Link to="/" viewTransition aria-label="SiteMate home" className="self-start">
+				<Link to="/" viewTransition aria-label="BFH App home" className="self-start">
 					<Wordmark />
 				</Link>
 				<div className="mx-auto flex w-full max-w-[420px] flex-1 flex-col justify-center py-10">
@@ -80,7 +80,7 @@ export function SignInPage({ mode = "sign-in" }: { mode?: "sign-in" | "sign-up" 
 						)}
 					</div>
 					<p className="mt-4 text-center text-sm text-muted-foreground">
-						New to SiteMate?{" "}
+						New to BFH App?{" "}
 						<Link to="/#request-access" className="font-medium text-link underline-offset-4 hover:underline">
 							Request access
 						</Link>

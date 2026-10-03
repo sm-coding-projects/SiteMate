@@ -3,7 +3,7 @@
 > **LOGIC:** When building a specific page, first check `design-system/sitemate/pages/[page-name].md`.
 > If that file exists, its rules **override** this Master file. If not, follow the rules below.
 
-**Project:** SiteMate · **Category:** Construction / field operations tool (B2B, mobile-first, outdoor use)
+**Project:** BFH App · **Category:** Construction / field operations tool (B2B, mobile-first, outdoor use)
 **Direction (2026-10-03 review):** construction drawings and survey markings, not generic SaaS.
 **Implementation:** tokens in `src/client/styles/globals.css` (Tailwind v4 + shadcn/ui CSS variables).
 Components use semantic tokens (`bg-primary`, `text-muted-foreground`, `bg-hivis`, `text-survey`), never raw hex —
@@ -69,7 +69,7 @@ All self-hosted via Fontsource (no Google Fonts round-trip on slow 4G).
 - **Faint 8px grid** (`.bg-grid`, stronger every 64px) on ink panels; **diagonal hatching** (`.bg-hatch`) for
   "to be supplied" placeholders, labelled `IMG` in mono; **registration ticks** on example cards; **dimension lines**.
 - **Icons:** Lucide only, one weight: 1.25px stroke globally (`.lucide` in CSS). 18px in nav and rows.
-- **Logo:** ink plate carrying the 8-segment bar with segment 4 in hi-vis + "SiteMate" in Archivo Expanded.
+- **Logo:** ink plate carrying the 8-segment bar with segment 4 in hi-vis + "BFH App" in Archivo Expanded.
 
 ---
 

@@ -15,7 +15,7 @@ interface __BaseEnv_Env {
 	ANTHROPIC_MODEL: "claude-opus-5-5";
 	OPENAI_COMPAT_MODEL: "openai/gpt-5-mini";
 	EMAIL_MODE: "sandbox";
-	EMAIL_FROM: "SiteMate <onboarding@resend.dev>";
+	EMAIL_FROM: "BFH App <onboarding@resend.dev>";
 	EMAIL_DAILY_LIMIT: "90";
 }
 declare namespace Cloudflare {

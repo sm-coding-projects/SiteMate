@@ -65,7 +65,7 @@ export function AccountPage() {
 			<SettingsRow
 				id="profile-h"
 				title="Profile"
-				description="Managed by your sign‑in account. Changes show up across SiteMate within a minute."
+				description="Managed by your sign‑in account. Changes show up across BFH App within a minute."
 			>
 				{isPending || !me ? (
 					<div className="flex items-center gap-4" aria-busy="true">
@@ -178,7 +178,7 @@ export function AccountPage() {
 					className="-ml-3 text-muted-foreground hover:text-destructive"
 					onClick={() => signOut({ redirectUrl: "/" })}
 				>
-					<LogOut aria-hidden /> Sign out of SiteMate
+					<LogOut aria-hidden /> Sign out of BFH App
 				</Button>
 			</SettingsRow>
 		</>

@@ -13,7 +13,7 @@ export class ApiRequestError extends Error {
 	}
 }
 
-const OFFLINE_MESSAGE = "Couldn't reach SiteMate. Check your signal — your change wasn't saved.";
+const OFFLINE_MESSAGE = "Couldn't reach BFH App. Check your signal — your change wasn't saved.";
 
 type GetToken = () => Promise<string | null>;
 

@@ -36,13 +36,13 @@ export function Wordmark({ className, tone = "paper" }: { className?: string; to
 	return (
 		<span
 			className={cn(
-				"inline-flex items-center gap-2.5 font-heading text-[1.0625rem] font-bold tracking-tight stretch-expanded",
+				"inline-flex items-center gap-2.5 whitespace-nowrap font-heading text-[1.0625rem] font-bold tracking-tight stretch-expanded",
 				tone === "ink" ? "text-[#eef0ec]" : "text-foreground",
 				className,
 			)}
 		>
 			<Mark />
-			SiteMate
+			BFH App
 		</span>
 	);
 }
