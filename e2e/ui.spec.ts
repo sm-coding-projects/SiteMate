@@ -196,3 +196,67 @@ test.describe("checklist attachments", () => {
 		await expect(page.getByRole("button", { name: /Actions for/ })).toHaveCount(0);
 	});
 });
+
+test.describe("team access", () => {
+	for (const width of [375, 1280]) {
+		test(`admins remove, restore and delete access at ${width}px`, async ({ page }) => {
+			await page.setViewportSize({ width, height: 900 });
+			const { writes } = await installApi(page, "admin");
+			await page.goto("/team");
+
+			// Not offered on your own row.
+			await expect(page.getByRole("button", { name: "Actions for Sam Site" })).toHaveCount(0);
+			await expect(page.getByText("Access removed")).toBeVisible();
+			await expect(page.getByRole("combobox", { name: "Role for Alex Former" })).toBeDisabled();
+			await noHorizontalScroll(page);
+			if (SHOTS) await page.screenshot({ path: `${SHOTS}/team-access-${width}.png`, fullPage: true });
+
+			await page.getByRole("button", { name: "Actions for Priya Patel" }).click();
+			if (SHOTS) await page.screenshot({ path: `${SHOTS}/team-menu-${width}.png` });
+			await page.getByRole("menuitem", { name: "Remove access" }).click();
+			const remove = page.getByRole("dialog", { name: "Remove access for Priya Patel?" });
+			await remove.getByRole("button", { name: "Remove access" }).click();
+			await expect(remove).toBeHidden();
+			expect(writes).toContain("POST /admin/users/u2/remove-access");
+
+			await page.getByRole("button", { name: "Actions for Alex Former" }).click();
+			await page.getByRole("menuitem", { name: "Restore access" }).click();
+			await expect.poll(() => writes).toContain("POST /admin/users/u3/restore-access");
+
+			await page.getByRole("button", { name: "Actions for Priya Patel" }).click();
+			await page.getByRole("menuitem", { name: "Delete permanently" }).click();
+			const del = page.getByRole("dialog", { name: "Delete Priya Patel permanently?" });
+			if (SHOTS) await del.screenshot({ path: `${SHOTS}/team-delete-dialog-${width}.png` });
+			await del.getByRole("button", { name: "Delete permanently" }).click();
+			await expect(del).toBeHidden();
+			expect(writes).toContain("DELETE /admin/users/u2");
+		});
+	}
+
+	test("admins can be deactivated but not deleted", async ({ page }) => {
+		await installApi(page, "admin");
+		const member = (id: string, name: string) => ({
+			id,
+			email: `${id}@example.com`,
+			name,
+			role: "admin",
+			imageUrl: null,
+			lastSignInAt: null,
+			accessRemoved: false,
+			createdAt: 0,
+		});
+		await page.route("**/api/admin/team", (route) =>
+			route.fulfill({
+				contentType: "application/json",
+				body: JSON.stringify({
+					members: [member("u1", "Sam Site"), member("u4", "Jo Admin")],
+					invitations: [],
+				}),
+			}),
+		);
+		await page.goto("/team");
+		await page.getByRole("button", { name: "Actions for Jo Admin" }).click();
+		await expect(page.getByRole("menuitem", { name: "Remove access" })).toBeVisible();
+		await expect(page.getByRole("menuitem", { name: "Delete permanently" })).toHaveCount(0);
+	});
+});

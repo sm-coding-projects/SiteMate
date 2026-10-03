@@ -47,6 +47,8 @@ export const requireUser = () =>
 
 		const db = c.get("db");
 		const existing = await db.query.users.findFirst({ where: eq(users.id, auth.userId) });
+		// Clerk ends a removed user's sessions, but a token already issued stays valid for up to a minute.
+		if (existing?.accessRevokedAt) throw new HTTPException(403, { message: "Your access has been removed" });
 
 		// Session token not customised yet: fall back to the Clerk API, but only when
 		// we have nothing stored for this user.

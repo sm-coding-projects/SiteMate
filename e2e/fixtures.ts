@@ -405,6 +405,7 @@ export function installApi(page: Page, role: "admin" | "viewer", opts: { slowIte
 							role: "admin",
 							imageUrl: null,
 							lastSignInAt: NOW - 3600_000,
+							accessRemoved: false,
 							createdAt: NOW - 200 * DAY,
 						},
 						{
@@ -414,7 +415,18 @@ export function installApi(page: Page, role: "admin" | "viewer", opts: { slowIte
 							role: "viewer",
 							imageUrl: null,
 							lastSignInAt: null,
+							accessRemoved: false,
 							createdAt: NOW - 20 * DAY,
+						},
+						{
+							id: "u3",
+							email: "former.sub@example.com",
+							name: "Alex Former",
+							role: "viewer",
+							imageUrl: null,
+							lastSignInAt: NOW - 40 * DAY,
+							accessRemoved: true,
+							createdAt: NOW - 90 * DAY,
 						},
 					],
 					invitations: [

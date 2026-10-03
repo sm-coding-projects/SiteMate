@@ -9,6 +9,9 @@ export const fakeClerk = {
 		getUser: vi.fn(),
 		getUserList: vi.fn(async () => ({ data: [], totalCount: 0 })),
 		updateUserMetadata: vi.fn(async (id: string, params: unknown) => ({ id, ...(params as object) })),
+		deleteUser: vi.fn(async (id: string) => ({ id, deleted: true })),
+		banUser: vi.fn(async (id: string) => ({ id, banned: true, emailAddresses: [] })),
+		unbanUser: vi.fn(async (id: string) => ({ id, banned: false, emailAddresses: [] })),
 	},
 	invitations: {
 		getInvitationList: vi.fn(async () => ({ data: [], totalCount: 0 })),

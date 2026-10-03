@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `access_revoked_at` integer;

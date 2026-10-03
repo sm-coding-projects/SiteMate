@@ -6,6 +6,7 @@ import { z } from "zod";
 import { activity, emailLog, ROLES, users } from "../../db/schema";
 import type { JobMessage, Role, Team } from "../../shared/api-types";
 import { idSchema, inviteCreate, roleUpdate } from "../../shared/schemas";
+import type { Db } from "../db";
 import { logActivity } from "../lib/activity";
 import { badRequest, zv } from "../lib/validate";
 import { requireRole } from "../middleware/auth";
@@ -13,6 +14,26 @@ import type { AppEnv } from "../types";
 
 const toRole = (v: unknown): Role => (ROLES.includes(v as Role) ? (v as Role) : "viewer");
 const userParam = z.object({ id: idSchema });
+
+type ClerkUser = {
+	primaryEmailAddress?: { emailAddress: string } | null;
+	emailAddresses?: { emailAddress: string }[];
+};
+const emailOf = (u: ClerkUser) =>
+	u.primaryEmailAddress?.emailAddress ?? u.emailAddresses?.[0]?.emailAddress ?? "";
+
+/** Mirrors a Clerk ban in `users` (a user who never signed in has no row yet) and logs it. */
+const setAccess = (db: Db, actorId: string, id: string, email: string, revokedAt: number | null) =>
+	db.batch([
+		db.update(users).set({ accessRevokedAt: revokedAt, updatedAt: Date.now() }).where(eq(users.id, id)),
+		logActivity(db, {
+			actorId,
+			action: revokedAt ? "user.access_removed" : "user.access_restored",
+			entityType: "user",
+			entityId: id,
+			meta: { email },
+		}),
+	]);
 
 /** Clerk API errors carry a list of { message, longMessage }; surface the first one. */
 function clerkError(err: unknown): never {
@@ -90,6 +111,7 @@ export const adminRoutes = new Hono<AppEnv>()
 				role: toRole(u.publicMetadata?.role),
 				imageUrl: u.hasImage ? u.imageUrl : null,
 				lastSignInAt: u.lastSignInAt,
+				accessRemoved: u.banned,
 				createdAt: u.createdAt,
 			})),
 			invitations: invites.data.map((i) => ({
@@ -133,6 +155,54 @@ export const adminRoutes = new Hono<AppEnv>()
 		return c.json({ ok: true });
 	})
 
+	/** Bans the user in Clerk: ends their sessions and blocks sign-in. Reversible, and their history stays. */
+	.post("/users/:id/remove-access", zv("param", userParam), async (c) => {
+		const me = c.get("user");
+		const { id } = c.req.valid("param");
+		if (id === me.id) throw badRequest("You can't remove your own access. Ask another admin.");
+		const banned = await c.get("clerk").users.banUser(id).catch(clerkError);
+		await setAccess(c.get("db"), me.id, id, emailOf(banned), Date.now());
+		return c.json({ id, accessRemoved: true });
+	})
+
+	.post("/users/:id/restore-access", zv("param", userParam), async (c) => {
+		const me = c.get("user");
+		const { id } = c.req.valid("param");
+		const restored = await c.get("clerk").users.unbanUser(id).catch(clerkError);
+		await setAccess(c.get("db"), me.id, id, emailOf(restored), null);
+		return c.json({ id, accessRemoved: false });
+	})
+
+	/**
+	 * Viewers only (admins can only have their access removed). Deletes the Clerk user, which frees the email
+	 * for a new invitation. The `users` row stays, revoked, because notes, files and activity point at it; it
+	 * also refuses a session token issued before the delete.
+	 */
+	.delete("/users/:id", zv("param", userParam), async (c) => {
+		const me = c.get("user");
+		const { id } = c.req.valid("param");
+		if (id === me.id) throw badRequest("You can't delete your own account. Ask another admin.");
+		const clerk = c.get("clerk");
+		const target = await clerk.users.getUser(id).catch(clerkError);
+		if (toRole(target.publicMetadata?.role) !== "viewer") {
+			throw badRequest("Only viewers can be deleted. Remove an admin's access instead.");
+		}
+		await clerk.users.deleteUser(id).catch(clerkError);
+		const db = c.get("db");
+		const now = Date.now();
+		await db.batch([
+			db.update(users).set({ accessRevokedAt: now, updatedAt: now }).where(eq(users.id, id)),
+			logActivity(db, {
+				actorId: me.id,
+				action: "user.deleted",
+				entityType: "user",
+				entityId: id,
+				meta: { email: emailOf(target) },
+			}),
+		]);
+		return c.json({ id, deleted: true });
+	})
+
 	.patch("/users/:id/role", zv("param", userParam), zv("json", roleUpdate), async (c) => {
 		const me = c.get("user");
 		const { id } = c.req.valid("param");
@@ -142,8 +212,7 @@ export const adminRoutes = new Hono<AppEnv>()
 		}
 		const clerk = c.get("clerk");
 		const updated = await clerk.users.updateUserMetadata(id, { publicMetadata: { role } }).catch(clerkError);
-		const email =
-			updated.primaryEmailAddress?.emailAddress ?? updated.emailAddresses?.[0]?.emailAddress ?? "";
+		const email = emailOf(updated);
 		const db = c.get("db");
 		// The session token picks the new role up on its next refresh (≤ 1 min); update our copy now.
 		await db.batch([

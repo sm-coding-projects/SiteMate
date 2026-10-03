@@ -134,6 +134,15 @@ export function describeActivity(e: ActivityEntry): { kind: ActivityKind; tag: s
 		case "user.role_changed":
 			what = `made ${str(m.email)} ${m.role === "admin" ? "an admin" : "a viewer"}`;
 			break;
+		case "user.access_removed":
+			what = `removed access for ${str(m.email)}`;
+			break;
+		case "user.access_restored":
+			what = `restored access for ${str(m.email)}`;
+			break;
+		case "user.deleted":
+			what = `deleted ${str(m.email)}'s account`;
+			break;
 		case "ai.model_changed":
 			what = m.host
 				? `switched the AI model to ${str(m.model)} (${str(m.host)})`
