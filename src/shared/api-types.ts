@@ -291,4 +291,5 @@ export type JobMessage =
 	| { type: "ping"; requestedBy: string; at: number }
 	| { type: "extract"; extractionId: string }
 	| { type: "notify"; kind: "stage_completed"; projectId: string; stageId: string; actorId: string }
-	| { type: "notify"; kind: "extraction_ready"; extractionId: string };
+	| { type: "notify"; kind: "extraction_ready"; extractionId: string }
+	| { type: "notify"; kind: "test"; to: string; requestedBy: string; at: number };

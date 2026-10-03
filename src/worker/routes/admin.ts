@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { ulid } from "ulid";
 import { z } from "zod";
-import { activity, ROLES, users } from "../../db/schema";
+import { activity, emailLog, ROLES, users } from "../../db/schema";
 import type { JobMessage, Role, Team } from "../../shared/api-types";
 import { idSchema, inviteCreate, roleUpdate } from "../../shared/schemas";
 import { logActivity } from "../lib/activity";
@@ -40,6 +40,40 @@ export const adminRoutes = new Hono<AppEnv>()
 			entityType: "system",
 		});
 		return c.json({ queued: true, message }, 202);
+	})
+
+	// Queues a test notification to the signed-in admin (sandbox mode redirects it to EMAIL_SANDBOX_TO).
+	.post("/test-email", async (c) => {
+		const user = c.get("user");
+		const message: JobMessage = {
+			type: "notify",
+			kind: "test",
+			to: user.email,
+			requestedBy: user.id,
+			at: Date.now(),
+		};
+		await c.env.JOBS.send(message);
+		return c.json({ queued: true, mode: c.env.EMAIL_MODE || "sandbox" }, 202);
+	})
+
+	/** Recent sends, for checking delivery and the daily cap. */
+	.get("/email-log", async (c) => {
+		const db = c.get("db");
+		const since = Date.now() - 86_400_000;
+		const [rows, sent] = await db.batch([
+			db.select().from(emailLog).orderBy(desc(emailLog.createdAt)).limit(25),
+			db
+				.select({ n: sql<number>`count(*)` })
+				.from(emailLog)
+				.where(and(eq(emailLog.status, "sent"), gte(emailLog.createdAt, since))),
+		]);
+		return c.json({
+			sentLast24h: sent[0]?.n ?? 0,
+			limit: Number(c.env.EMAIL_DAILY_LIMIT || 90),
+			mode: c.env.EMAIL_MODE || "sandbox",
+			configured: Boolean(c.env.RESEND_API_KEY),
+			items: rows,
+		});
 	})
 
 	.get("/team", async (c) => {

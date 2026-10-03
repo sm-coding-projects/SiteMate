@@ -66,6 +66,22 @@ async function recipients(db: Db, opts: { adminsOnly: boolean; exclude?: string 
 
 async function buildEmails(env: Bindings, db: Db, msg: NotifyMessage): Promise<Email[]> {
 	const app = (env.APP_URL || "").replace(/\/$/, "");
+	if (msg.kind === "test") {
+		return [
+			{
+				kind: "test",
+				key: `test:${msg.requestedBy}:${msg.at}`,
+				to: msg.to,
+				subject: "SiteMate test email",
+				heading: "Email is working",
+				lines: [
+					"This is a test notification from SiteMate.",
+					`Mode: ${(env.EMAIL_MODE || "sandbox") === "live" ? "live" : "sandbox (redirected to the Resend account owner)"}.`,
+				],
+				cta: { label: "Open SiteMate", url: `${app}/projects` },
+			},
+		];
+	}
 	if (msg.kind === "stage_completed") {
 		const row = await db
 			.select({
@@ -154,19 +170,22 @@ export async function deliver(env: Bindings, db: Db, emails: Email[]) {
 				error: extra.error ?? null,
 			});
 
-		const already = await db
-			.select({ id: emailLog.id })
-			.from(emailLog)
-			.where(
-				and(
-					eq(emailLog.kind, e.kind),
-					eq(emailLog.intendedTo, e.to),
-					eq(emailLog.subject, e.subject),
-					eq(emailLog.status, "sent"),
-					gte(emailLog.createdAt, Date.now() - 86_400_000),
-				),
-			)
-			.get();
+		// One email per event and recipient per day, even if the queue retries (test emails always send).
+		const already =
+			e.kind !== "test" &&
+			(await db
+				.select({ id: emailLog.id })
+				.from(emailLog)
+				.where(
+					and(
+						eq(emailLog.kind, e.kind),
+						eq(emailLog.intendedTo, e.to),
+						eq(emailLog.subject, e.subject),
+						eq(emailLog.status, "sent"),
+						gte(emailLog.createdAt, Date.now() - 86_400_000),
+					),
+				)
+				.get());
 		if (already) continue;
 		if (!resend) {
 			await log("skipped", { error: "RESEND_API_KEY not set" });
