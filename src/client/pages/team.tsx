@@ -255,7 +255,7 @@ function MemberRow({
 				<option value="admin">Admin</option>
 				<option value="viewer">Viewer</option>
 			</NativeSelect>
-			{!isMe && (
+			{!isMe ? (
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
 						<Button
@@ -293,6 +293,9 @@ function MemberRow({
 						)}
 					</DropdownMenuContent>
 				</DropdownMenu>
+			) : (
+				// Your own row has no actions menu; hold its place so every role select lines up.
+				<span aria-hidden className="size-11 shrink-0" />
 			)}
 		</li>
 	);
