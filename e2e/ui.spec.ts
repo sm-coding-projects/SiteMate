@@ -101,6 +101,76 @@ test.describe("admin interactions", () => {
 		await expect(page.getByText(/Ticked by Sam Site/).last()).toBeVisible({ timeout: 500 });
 	});
 
+	test("new project: address and suburb suggestions fill the rest of the address", async ({ page }) => {
+		await installApi(page, "admin");
+		// Photon is a third-party service; serve its response shape (one house, one street) locally.
+		await page.route("https://photon.komoot.io/**", (route) =>
+			route.fulfill({
+				contentType: "application/json",
+				body: JSON.stringify({
+					features: [
+						{
+							properties: {
+								type: "house",
+								housenumber: "14",
+								street: "Banksia Street",
+								locality: "Elara",
+								district: "Marsden Park",
+								city: "Sydney",
+								state: "New South Wales",
+								postcode: "2765",
+								countrycode: "AU",
+							},
+						},
+						{
+							properties: {
+								type: "street",
+								name: "Banksia Street",
+								district: "Botany",
+								city: "Sydney",
+								state: "New South Wales",
+								postcode: "2019",
+								countrycode: "AU",
+							},
+						},
+					],
+				}),
+			}),
+		);
+		await page.goto("/projects");
+		await page.getByRole("button", { name: "New project" }).click();
+		await page.getByLabel("Project name").fill("Banksia");
+
+		const address = page.getByRole("combobox", { name: "Site address" });
+		await address.fill("14 Banksia");
+		await page.getByRole("option", { name: "14 Banksia Street, Marsden Park NSW 2765" }).click();
+		await expect(address).toHaveValue("14 Banksia Street");
+		const suburb = page.getByRole("combobox", { name: "Suburb" });
+		await expect(suburb).toHaveValue("Marsden Park");
+		await expect(page.getByLabel("State")).toHaveValue("NSW");
+		await expect(page.getByLabel("Postcode")).toHaveValue("2765");
+		if (SHOTS) await page.screenshot({ path: `${SHOTS}/new-project-address.png` });
+
+		// The suburb list works by keyboard: type, arrow down, Enter fills state and postcode.
+		await page.mouse.move(0, 0); // nothing hovered, so the arrow starts from the top
+		await suburb.fill("box hi");
+		await expect(page.getByRole("option", { name: /Box Hill\s*NSW 2765/ })).toBeVisible();
+		if (SHOTS) await page.screenshot({ path: `${SHOTS}/new-project-suburb.png` });
+		await suburb.press("ArrowDown");
+		await suburb.press("Enter");
+		await expect(suburb).toHaveValue("Box Hill");
+		await expect(page.getByRole("dialog")).toBeVisible(); // Enter picked, it didn't submit
+
+		const created = page.waitForRequest((r) => r.method() === "POST" && r.url().endsWith("/api/projects"));
+		await page.getByRole("button", { name: "Create project" }).click();
+		expect((await created).postDataJSON()).toMatchObject({
+			siteAddress: "14 Banksia Street",
+			suburb: "Box Hill",
+			state: "NSW",
+			postcode: "2765",
+		});
+	});
+
 	test("live validation flags the bad GST on the review screen", async ({ page }) => {
 		await installApi(page, "admin");
 		await page.goto("/review/e1");

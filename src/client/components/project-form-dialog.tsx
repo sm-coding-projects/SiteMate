@@ -1,5 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { useNavigate } from "react-router";
+import { AddressFields } from "@/components/address-fields";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -21,6 +22,8 @@ const FIELDS = [
 	"name",
 	"siteAddress",
 	"suburb",
+	"state",
+	"postcode",
 	"clientName",
 	"clientEmail",
 	"clientPhone",
@@ -128,8 +131,11 @@ export function ProjectFormDialog({
 					</DialogHeader>
 					<DialogBody className="grid gap-4">
 						{field("name", "Project name", { autoFocus: !editing, placeholder: "14 Banksia St" })}
-						{field("siteAddress", "Site address", { autoComplete: "street-address" })}
-						{field("suburb", "Suburb", { autoComplete: "address-level2" })}
+						<AddressFields
+							value={form}
+							onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+							errors={errors}
+						/>
 						<div className="grid gap-4 sm:grid-cols-2">
 							{field("clientName", "Client name")}
 							{field("clientPhone", "Client phone", { type: "tel", inputMode: "tel" })}

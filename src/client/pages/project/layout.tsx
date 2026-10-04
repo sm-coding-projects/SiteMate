@@ -20,6 +20,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useArchiveProject, useProject, useUpdateProject } from "@/hooks/use-data";
 import { useIsAdmin } from "@/hooks/use-me";
+import { formatAddress } from "@/lib/address";
 import { ApiRequestError } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -76,7 +77,7 @@ export function ProjectLayout() {
 					<div className="min-w-0">
 						<h1 className="text-2xl font-semibold break-words md:text-[1.75rem]">{p.name}</h1>
 						<p className="mt-1 text-muted-foreground">
-							{[p.siteAddress, p.suburb].filter(Boolean).join(", ") || "No site address"}
+							{formatAddress(p) || "No site address"}
 							{p.clientName && ` · ${p.clientName}`}
 						</p>
 						{(p.startDate || p.targetCompletion) && (

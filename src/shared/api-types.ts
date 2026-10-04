@@ -25,6 +25,7 @@ export interface Page<T> {
 }
 
 export type ProjectStatus = "active" | "on_hold" | "complete" | "archived";
+export type AuState = "ACT" | "NSW" | "NT" | "QLD" | "SA" | "TAS" | "VIC" | "WA";
 export type Source = "template" | "custom";
 export type { StageStatus };
 
@@ -52,6 +53,8 @@ export interface ProjectSummary {
 	name: string;
 	siteAddress: string | null;
 	suburb: string | null;
+	state: AuState | null;
+	postcode: string | null;
 	clientName: string | null;
 	status: ProjectStatus;
 	startDate: string | null;
@@ -101,6 +104,8 @@ export interface ProjectDetail {
 	name: string;
 	siteAddress: string | null;
 	suburb: string | null;
+	state: AuState | null;
+	postcode: string | null;
 	clientName: string | null;
 	clientEmail: string | null;
 	clientPhone: string | null;

@@ -60,6 +60,43 @@ describe("projects", () => {
 		expect(bad.status).toBe(400);
 	});
 
+	it("stores state and postcode, validates them and searches by postcode", async () => {
+		const res = await api<{ id: string }>("/projects", {
+			as: ADMIN,
+			method: "POST",
+			body: {
+				name: "Postcode House",
+				siteAddress: "3 Wattle Rd",
+				suburb: "Box Hill",
+				state: "NSW",
+				postcode: "2765",
+			},
+		});
+		expect(res.status).toBe(201);
+		const detail = await api<ProjectDetail>(`/projects/${res.body.id}`, { as: ADMIN });
+		expect(detail.body).toMatchObject({ suburb: "Box Hill", state: "NSW", postcode: "2765" });
+
+		const search = await api<Page<ProjectSummary>>("/projects?q=2765", { as: ADMIN });
+		expect(search.body.items.find((p) => p.id === res.body.id)).toMatchObject({
+			state: "NSW",
+			postcode: "2765",
+		});
+
+		// Blank clears; anything else that isn't a state or a 4-digit postcode is rejected.
+		const cleared = await api(`/projects/${res.body.id}`, {
+			as: ADMIN,
+			method: "PATCH",
+			body: { state: "", postcode: "" },
+		});
+		expect(cleared.status).toBe(200);
+		const after = await api<ProjectDetail>(`/projects/${res.body.id}`, { as: ADMIN });
+		expect(after.body).toMatchObject({ state: null, postcode: null });
+		for (const body of [{ state: "XYZ" }, { postcode: "276" }, { postcode: "27650" }]) {
+			const bad = await api(`/projects/${res.body.id}`, { as: ADMIN, method: "PATCH", body });
+			expect(bad.status).toBe(400);
+		}
+	});
+
 	it("lists, filters, searches and paginates", async () => {
 		const a = await createProject("Alpha House");
 		await createProject("Bravo Duplex");

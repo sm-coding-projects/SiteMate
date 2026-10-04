@@ -53,7 +53,7 @@ soft delete via `deleted_at` on user content.
 | `workflow_templates` | id, name, description, is_default |
 | `template_stages` | id, template_id, name, description, position |
 | `template_items` | id, template_stage_id, title, position |
-| `projects` | id, name, site_address, suburb, client_name, client_email, client_phone, status (`active`/`on_hold`/`complete`/`archived`), start_date, target_completion, template_id, created_by, timestamps |
+| `projects` | id, name, site_address, suburb, state, postcode, client_name, client_email, client_phone, status (`active`/`on_hold`/`complete`/`archived`), start_date, target_completion, template_id, created_by, timestamps |
 | `project_stages` | id, project_id, name, description, position, status (`not_started`/`in_progress`/`complete`), source, started_at, completed_at |
 | `project_items` | id, project_stage_id, title, position, source, completed_at, completed_by |
 | `suppliers` | id, name, abn, trade, email, phone — shared across projects |
