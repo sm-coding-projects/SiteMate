@@ -171,6 +171,44 @@ test.describe("admin interactions", () => {
 		});
 	});
 
+	test("a typed house number is kept when OSM only knows the street", async ({ page }) => {
+		await installApi(page, "admin");
+		await page.route("https://photon.komoot.io/**", (route) =>
+			route.fulfill({
+				contentType: "application/json",
+				body: JSON.stringify({
+					features: [
+						{
+							properties: {
+								type: "street",
+								name: "Copper Street",
+								district: "The Ponds",
+								city: "Sydney",
+								state: "New South Wales",
+								postcode: "2769",
+								countrycode: "AU",
+							},
+						},
+					],
+				}),
+			}),
+		);
+		await page.goto("/projects");
+		await page.getByRole("button", { name: "New project" }).click();
+		const address = page.getByRole("combobox", { name: "Site address" });
+
+		await address.fill("3/31a Copper street the ponds");
+		await expect(page.getByRole("option", { name: "3/31A Copper Street, The Ponds NSW 2769" })).toBeVisible();
+
+		await address.fill("31 Copper street the ponds");
+		const options = page.locator("#pf-siteAddress ~ div [role=option]");
+		await expect(options).toHaveText(["31 Copper Street, The Ponds NSW 2769"]);
+		await options.first().click();
+		await expect(address).toHaveValue("31 Copper Street");
+		await expect(page.getByRole("combobox", { name: "Suburb" })).toHaveValue("The Ponds");
+		await expect(page.getByLabel("Postcode")).toHaveValue("2769");
+	});
+
 	test("live validation flags the bad GST on the review screen", async ({ page }) => {
 		await installApi(page, "admin");
 		await page.goto("/review/e1");

@@ -84,7 +84,11 @@ interface PhotonProps {
 	countrycode?: string;
 }
 
-/** Up to 6 Australian street/house matches. Throws on network errors and aborts; callers ignore both. */
+/**
+ * Up to 6 Australian street/house matches. Throws on network errors and aborts; callers ignore both.
+ * OSM often knows a street but not each house on it (new estates especially), so a house number typed at
+ * the start is put on every street it matched, and those come first.
+ */
 export async function searchAddresses(query: string, signal?: AbortSignal): Promise<AddressOption[]> {
 	const params = new URLSearchParams({ q: query, limit: "8", lang: "en", bbox: AU_BBOX });
 	params.append("layer", "house");
@@ -92,28 +96,43 @@ export async function searchAddresses(query: string, signal?: AbortSignal): Prom
 	const [res, list] = await Promise.all([fetch(`${PHOTON}?${params}`, { signal }), loadSuburbs()]);
 	if (!res.ok) throw new Error(`Photon ${res.status}`);
 	const body = (await res.json()) as { features?: { properties: PhotonProps }[] };
+	const typed = houseNumber(query);
 	const seen = new Set<string>();
-	const out: AddressOption[] = [];
-	for (const { properties } of body.features ?? []) {
-		const option = toOption(properties, list);
-		if (!option || seen.has(option.label)) continue;
+	const withTyped: AddressOption[] = [];
+	const others: AddressOption[] = [];
+	const add = (option: AddressOption | null, to: AddressOption[]) => {
+		if (!option || seen.has(option.label)) return;
 		seen.add(option.label);
-		out.push(option);
-		if (out.length === 6) break;
+		to.push(option);
+	};
+	for (const { properties } of body.features ?? []) {
+		if (typed) add(toOption(properties, list, typed), withTyped);
+		// A bare street is no use once a number is typed; other house numbers may be a typo, so keep them.
+		if (!typed || properties.type !== "street") add(toOption(properties, list), others);
 	}
-	return out;
+	return [...withTyped, ...others].slice(0, 6);
+}
+
+/** The house number a query starts with: "31", "31A", "3/31", "12-14", "Lot 5". */
+export function houseNumber(query: string): string | undefined {
+	const m = /^\s*((?:lot\s+)?\d+[a-z]?(?:\s*[-/]\s*\d+[a-z]?)?)(?=[\s,]|$)/i.exec(query);
+	if (!m?.[1] || m[1] === query.trim()) return undefined;
+	return m[1]
+		.replace(/\s*([-/])\s*/g, "$1")
+		.replace(/^lot\s+/i, "Lot ")
+		.replace(/[a-z]$/, (c) => c.toUpperCase());
 }
 
 /**
  * OSM's idea of "suburb" varies by area: Photon puts it in `district`, `locality` (sometimes an estate) or
  * `city` (sometimes the whole metro, "Sydney"). The first candidate that is a real suburb in the G-NAF
- * list wins, which also fills a missing postcode.
+ * list wins, which also fills a missing postcode. `number` replaces the house number (or adds one to a street).
  */
-export function toOption(p: PhotonProps, list: SuburbOption[]): AddressOption | null {
+export function toOption(p: PhotonProps, list: SuburbOption[], number?: string): AddressOption | null {
 	if (p.countrycode && p.countrycode !== "AU") return null;
-	const siteAddress =
-		p.type === "street" ? (p.name ?? "") : [p.housenumber, p.street].filter(Boolean).join(" ");
-	if (!siteAddress) return null;
+	const street = p.type === "street" ? p.name : p.street;
+	const siteAddress = [number ?? p.housenumber, street].filter(Boolean).join(" ");
+	if (!street) return null;
 	const state = p.state ? (STATE_NAMES[p.state.toLowerCase()] ?? toState(p.state)) : undefined;
 	const candidates = [p.district, p.locality, p.city].filter((c): c is string => Boolean(c));
 	const inState = (s: SuburbOption) => !state || s.state === state;
