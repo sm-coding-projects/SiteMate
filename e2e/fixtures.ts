@@ -62,6 +62,8 @@ export function makeProject() {
 		name: "14 Banksia St",
 		siteAddress: "14 Banksia Street",
 		suburb: "Marsden Park",
+		state: "NSW",
+		postcode: "2765",
 		clientName: "Nguyen family",
 		clientEmail: "nguyen@example.com",
 		clientPhone: "0400 000 000",

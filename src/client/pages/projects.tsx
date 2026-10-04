@@ -89,7 +89,7 @@ export function ProjectsPage() {
 							type="search"
 							value={search}
 							onChange={(e) => setSearch(e.target.value)}
-							placeholder="Search name, suburb or address"
+							placeholder="Search name, address or postcode"
 							aria-label="Search projects"
 							className="pl-10"
 						/>

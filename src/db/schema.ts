@@ -21,6 +21,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import {
 	AI_PROTOCOLS,
+	AU_STATES,
 	EXTRACTION_STATUSES,
 	FILE_CATEGORIES,
 	PROJECT_STATUSES,
@@ -121,6 +122,8 @@ export const projects = sqliteTable(
 		name: text("name").notNull(),
 		siteAddress: text("site_address"),
 		suburb: text("suburb"),
+		state: text("state", { enum: AU_STATES }),
+		postcode: text("postcode"),
 		clientName: text("client_name"),
 		clientEmail: text("client_email"),
 		clientPhone: text("client_phone"),

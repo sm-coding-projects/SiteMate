@@ -51,7 +51,7 @@ export const templateRoutes = new Hono<AppEnv>().get("/", async (c) => {
 });
 
 export const projectRoutes = new Hono<AppEnv>()
-	// List: filter by status, search name/suburb/address, keyset-paginated by last change.
+	// List: filter by status, search name/suburb/address/postcode, keyset-paginated by last change.
 	.get("/", zv("query", projectListQuery), async (c) => {
 		const db = c.get("db");
 		const { status, q, cursor, limit } = c.req.valid("query");
@@ -67,6 +67,7 @@ export const projectRoutes = new Hono<AppEnv>()
 				sql`${projects.name} like ${pattern} escape '\\'`,
 				sql`${projects.suburb} like ${pattern} escape '\\'`,
 				sql`${projects.siteAddress} like ${pattern} escape '\\'`,
+				sql`${projects.postcode} like ${pattern} escape '\\'`,
 			);
 			if (match) where.push(match);
 		}
@@ -147,6 +148,8 @@ export const projectRoutes = new Hono<AppEnv>()
 				name: p.name,
 				siteAddress: p.siteAddress,
 				suburb: p.suburb,
+				state: p.state,
+				postcode: p.postcode,
 				clientName: p.clientName,
 				status: p.status,
 				startDate: p.startDate,
@@ -314,6 +317,8 @@ export const projectRoutes = new Hono<AppEnv>()
 			name: project.name,
 			siteAddress: project.siteAddress,
 			suburb: project.suburb,
+			state: project.state,
+			postcode: project.postcode,
 			clientName: project.clientName,
 			clientEmail: project.clientEmail,
 			clientPhone: project.clientPhone,

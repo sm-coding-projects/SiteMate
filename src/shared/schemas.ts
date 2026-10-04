@@ -19,6 +19,8 @@ export const DOCUMENT_CATEGORIES = FILE_CATEGORIES.filter((c) => c !== "photo");
 export const QUOTE_STATUSES = ["pending", "accepted", "rejected"] as const;
 export const EXTRACTION_STATUSES = ["queued", "processing", "needs_review", "confirmed", "failed"] as const;
 export const DOCUMENT_TYPES = ["quote", "invoice", "certificate", "plan", "contract", "other"] as const;
+/** Australian states and territories, as the project address stores them. */
+export const AU_STATES = ["ACT", "NSW", "NT", "QLD", "SA", "TAS", "VIC", "WA"] as const;
 export const ROLE_VALUES = ["admin", "viewer"] as const;
 /** Wire formats a custom AI endpoint can speak. */
 export const AI_PROTOCOLS = ["openai", "anthropic"] as const;
@@ -81,6 +83,22 @@ const projectFields = {
 	name: z.string().trim().min(1, "Give the project a name").max(120),
 	siteAddress: optionalText(200),
 	suburb: optionalText(80),
+	state: z
+		.union([z.enum(AU_STATES), z.literal("")])
+		.transform((s) => (s === "" ? null : s))
+		.nullable()
+		.optional(),
+	postcode: z
+		.union([
+			z
+				.string()
+				.trim()
+				.regex(/^\d{4}$/, "Use a 4-digit postcode"),
+			z.literal(""),
+		])
+		.transform((s) => (s === "" ? null : s))
+		.nullable()
+		.optional(),
 	clientName: optionalText(120),
 	clientEmail: optionalEmail,
 	clientPhone: optionalText(40),

@@ -10,6 +10,7 @@
 		"includes": [
 			"**",
 			"!src/worker/worker-configuration.d.ts",
+			"!src/client/data",
 			"!migrations/meta",
 			"!design-system",
 			"!docs",

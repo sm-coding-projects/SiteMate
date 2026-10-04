@@ -284,6 +284,20 @@ All routes are under `/api`. Every write route requires the `admin` role (`requi
 | `GET /admin/team`, `POST /admin/invitations`, `DELETE /admin/invitations/:id`, `PATCH /admin/users/:id/role`, `PUT /admin/users/:id/projects`, `POST /admin/users/:id/remove-access`, `POST /admin/users/:id/restore-access`, `DELETE /admin/users/:id` | Team (Clerk); viewers' projects |
 | `POST /admin/test-email`, `GET /admin/email-log`, `POST /admin/queue-ping` | Ops checks |
 
+## Address suggestions
+
+The project form suggests addresses without any API key or account:
+
+- **Street addresses** come from [Photon](https://photon.komoot.io), a free public geocoder over OpenStreetMap
+  data, called straight from the browser (fair use, no uptime guarantee). Data © OpenStreetMap contributors,
+  ODbL.
+- **Suburb → state + postcode** comes from `src/client/data/au-suburbs.json`, built from G-NAF and loaded only
+  when an address field is focused. Rebuild it for a newer G-NAF release with `node scripts/build-suburbs.mjs`.
+  Incorporates or developed using G-NAF © Geoscape Australia licensed by the Commonwealth of Australia under
+  the Open Geo-coded National Address File (G-NAF) End User Licence Agreement.
+
+Both are hints: new estates are often in neither, so every address field can be typed by hand.
+
 ## Free-tier budget
 
 | Service | Free limit | How BFH App stays under it |

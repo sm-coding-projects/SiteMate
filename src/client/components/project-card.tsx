@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import { Link } from "react-router";
 import { StageBar } from "@/components/brand/stage-bar";
 import { StatusBadge } from "@/components/status-badge";
+import { formatAddress } from "@/lib/address";
 import { nbHyphen, stageCode, timeAgo } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { ProjectSummary } from "../../shared/api-types";
@@ -51,7 +52,7 @@ export function StageSummary({
 }
 
 export function ProjectCard({ project, index = 0 }: { project: ProjectSummary; index?: number }) {
-	const place = [project.siteAddress, project.suburb].filter(Boolean).join(", ");
+	const place = formatAddress(project);
 	return (
 		<li
 			className="animate-row-in"
