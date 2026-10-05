@@ -300,6 +300,58 @@ test.describe("checklist attachments", () => {
 		});
 	}
 
+	test("checklist attachments open in the viewer and step through the check's files", async ({ page }) => {
+		await installApi(page, "viewer");
+		const popups: string[] = [];
+		page.on("popup", (p) => popups.push(p.url()));
+		await page.goto("/projects/p1?stage=s3");
+
+		await page.getByRole("button", { name: "Open photo IMG_1001.jpg" }).click();
+		const viewer = page.getByRole("dialog", { name: /IMG_1001\.jpg, photo 1 of 2/ });
+		await expect(viewer).toBeVisible();
+		await expect(viewer.locator("img")).toBeVisible();
+		await viewer.getByRole("button", { name: "Next photo" }).click();
+		await expect(page.getByRole("dialog", { name: /IMG_1002\.jpg, photo 2 of 2/ })).toBeVisible();
+		await page.keyboard.press("ArrowLeft");
+		await expect(page.getByRole("dialog", { name: /IMG_1001\.jpg, photo 1 of 2/ })).toBeVisible();
+		await page.keyboard.press("Escape");
+
+		// A single PDF: shown inline, no previous/next, and a new tab only when asked for.
+		await page.getByRole("button", { name: "Termite protection certificate.pdf" }).click();
+		const pdf = page.getByRole("dialog", { name: "Termite protection certificate.pdf" });
+		await expect(pdf.locator('iframe[title="Termite protection certificate.pdf"]')).toBeVisible();
+		await expect(pdf.getByRole("button", { name: /Next/ })).toHaveCount(0);
+		expect(popups).toEqual([]);
+		const popup = page.waitForEvent("popup");
+		await pdf.getByRole("button", { name: "Open in new tab" }).click();
+		await popup;
+	});
+
+	test("documents open in the viewer; Word files offer a download instead of a preview", async ({ page }) => {
+		await installApi(page, "admin");
+		const popups: string[] = [];
+		page.on("popup", (p) => popups.push(p.url()));
+		await page.goto("/projects/p1/documents");
+
+		await page.getByRole("button", { name: "Harbour Frames Q-1042.pdf", exact: true }).click();
+		const viewer = page.getByRole("dialog", { name: /Harbour Frames Q-1042\.pdf, file 1 of 3/ });
+		await expect(viewer.locator("iframe")).toBeVisible();
+		// The dialog's name follows the file shown, so step with page-level locators.
+		await page.getByRole("button", { name: "Next file" }).click();
+		await expect(page.getByRole("dialog", { name: /certificate\.pdf, file 2 of 3/ })).toBeVisible();
+		await page.getByRole("button", { name: "Next file" }).click();
+		const word = page.getByRole("dialog", { name: /Window schedule\.docx, file 3 of 3/ });
+		await expect(word.getByText("This file type can't be previewed here.")).toBeVisible();
+		await expect(word.locator("iframe")).toHaveCount(0);
+		if (SHOTS) await page.screenshot({ path: `${SHOTS}/viewer-docx.png` });
+		await page.keyboard.press("Escape");
+
+		// "Open in new tab" stays available, from the row's menu.
+		await page.getByRole("button", { name: "Actions for Harbour Frames Q-1042.pdf" }).click();
+		await expect(page.getByRole("menuitem", { name: "Open in new tab" })).toBeVisible();
+		expect(popups).toEqual([]);
+	});
+
 	test("viewers see and can open attachments but can't change them", async ({ page }) => {
 		await installApi(page, "viewer");
 		await page.goto("/projects/p1?stage=s3");

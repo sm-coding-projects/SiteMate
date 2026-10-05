@@ -1,15 +1,14 @@
-import { Camera, ChevronLeft, ChevronRight, ImagePlus, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Camera, ImagePlus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { FileViewer } from "@/components/file-viewer";
 import { LoadMore, QueryError } from "@/components/query-state";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Field, Input, NativeSelect } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UploadDialog } from "@/components/upload-dialog";
-import { useDeleteFile, useFiles, useFileUrl, useUpdateFile } from "@/hooks/use-data";
+import { useDeleteFile, useFiles, useUpdateFile } from "@/hooks/use-data";
 import { useUploads } from "@/hooks/use-uploads";
-import { errorMessage } from "@/lib/api";
 import { formatDate, nbHyphen } from "@/lib/format";
 import type { FileEntry } from "../../../shared/api-types";
 import { useProjectContext } from "./layout";
@@ -160,156 +159,92 @@ function Lightbox({
 }) {
 	const { project, isAdmin } = useProjectContext();
 	const photo = photos[index] as FileEntry;
-	const getUrl = useFileUrl();
-	const [url, setUrl] = useState<string | null>(null);
-	const [error, setError] = useState<string | null>(null);
 	const [caption, setCaption] = useState(photo.caption ?? "");
 	const [deleting, setDeleting] = useState(false);
 	const update = useUpdateFile(project.id);
 	const remove = useDeleteFile(project.id);
 
-	useEffect(() => {
-		let live = true;
-		setUrl(null);
-		setError(null);
-		setCaption(photo.caption ?? "");
-		getUrl(photo.id)
-			.then((r) => live && setUrl(r.url))
-			.catch((e) => live && setError(errorMessage(e)));
-		return () => {
-			live = false;
-		};
-	}, [photo.id, photo.caption, getUrl]);
-
-	const go = useCallback(
-		(d: -1 | 1) => {
-			const next = index + d;
-			if (next >= 0 && next < photos.length) onIndex(next);
-		},
-		[index, photos.length, onIndex],
-	);
-	useEffect(() => {
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key === "ArrowLeft") go(-1);
-			if (e.key === "ArrowRight") go(1);
-		};
-		window.addEventListener("keydown", onKey);
-		return () => window.removeEventListener("keydown", onKey);
-	}, [go]);
+	useEffect(() => setCaption(photo.caption ?? ""), [photo.caption]);
 
 	return (
-		<Dialog open onOpenChange={(o) => !o && onClose()}>
-			<DialogContent wide aria-describedby={undefined} className="sm:max-w-5xl">
-				<DialogTitle className="sr-only">
-					Photo {index + 1} of {photos.length}
-				</DialogTitle>
-				<div className="relative grid min-h-[50dvh] place-items-center bg-ink sm:rounded-t-lg">
-					{url ? (
-						<img
-							src={url}
-							alt={photo.caption ?? ""}
-							className="max-h-[70dvh] w-auto max-w-full object-contain"
+		<FileViewer
+			files={photos}
+			index={index}
+			onIndex={onIndex}
+			onClose={onClose}
+			meta={
+				<>
+					{photo.stage && `${nbHyphen(photo.stage.name)} · `}
+					{photo.uploadedBy.name} · {formatDate(photo.uploadedAt)}
+				</>
+			}
+		>
+			{isAdmin ? (
+				<form
+					className="flex flex-col gap-2 sm:flex-row sm:items-end"
+					onSubmit={(e) => {
+						e.preventDefault();
+						update.mutate({ id: photo.id, caption: caption.trim() || null });
+					}}
+				>
+					<Field id="lb-caption" label="Caption" className="flex-1">
+						<Input
+							id="lb-caption"
+							value={caption}
+							onChange={(e) => setCaption(e.target.value)}
+							maxLength={300}
 						/>
-					) : error ? (
-						<p className="px-6 text-center text-sm text-[#eef0ec]">{error}</p>
-					) : (
-						<Skeleton className="size-full min-h-[50dvh] rounded-none bg-white/5" />
-					)}
-					<Button
-						variant="secondary"
-						size="icon"
-						className="absolute top-1/2 left-2 -translate-y-1/2"
-						onClick={() => go(-1)}
-						disabled={index === 0}
-						aria-label="Previous photo"
-					>
-						<ChevronLeft aria-hidden />
-					</Button>
-					<Button
-						variant="secondary"
-						size="icon"
-						className="absolute top-1/2 right-2 -translate-y-1/2"
-						onClick={() => go(1)}
-						disabled={index === photos.length - 1}
-						aria-label="Next photo"
-					>
-						<ChevronRight aria-hidden />
-					</Button>
-				</div>
-				<div className="grid gap-3 overflow-y-auto px-6 py-4">
-					<p className="label-mono text-muted-foreground">
-						{index + 1}/{photos.length}
-						{photo.stage && ` · ${nbHyphen(photo.stage.name)}`} · {photo.uploadedBy.name} ·{" "}
-						{formatDate(photo.uploadedAt)}
-					</p>
-					{isAdmin ? (
-						<form
-							className="flex flex-col gap-2 sm:flex-row sm:items-end"
-							onSubmit={(e) => {
-								e.preventDefault();
-								update.mutate({ id: photo.id, caption: caption.trim() || null });
-							}}
+					</Field>
+					<Field id="lb-stage" label="Stage" className="sm:w-48">
+						<NativeSelect
+							id="lb-stage"
+							value={photo.stage?.id ?? ""}
+							onChange={(e) => update.mutate({ id: photo.id, stageId: e.target.value || null })}
 						>
-							<Field id="lb-caption" label="Caption" className="flex-1">
-								<Input
-									id="lb-caption"
-									value={caption}
-									onChange={(e) => setCaption(e.target.value)}
-									maxLength={300}
-								/>
-							</Field>
-							<Field id="lb-stage" label="Stage" className="sm:w-48">
-								<NativeSelect
-									id="lb-stage"
-									value={photo.stage?.id ?? ""}
-									onChange={(e) => update.mutate({ id: photo.id, stageId: e.target.value || null })}
-								>
-									<option value="">No stage</option>
-									{project.stages.map((s) => (
-										<option key={s.id} value={s.id}>
-											{s.name}
-										</option>
-									))}
-								</NativeSelect>
-							</Field>
-							<div className="flex gap-2">
-								<Button type="submit" variant="outline" disabled={update.isPending}>
-									Save
-								</Button>
-								<Button
-									type="button"
-									variant="ghost"
-									size="icon"
-									aria-label="Delete photo"
-									onClick={() => setDeleting(true)}
-								>
-									<Trash2 aria-hidden />
-								</Button>
-							</div>
-						</form>
-					) : (
-						photo.caption && <p>{photo.caption}</p>
-					)}
-				</div>
-				<ConfirmDialog
-					open={deleting}
-					onOpenChange={setDeleting}
-					title="Delete this photo?"
-					description="It's removed from the project. An admin can ask for it to be recovered from storage."
-					confirmLabel="Delete photo"
-					destructive
-					pending={remove.isPending}
-					onConfirm={() =>
-						remove.mutate(photo.id, {
-							onSuccess: () => {
-								setDeleting(false);
-								onClose();
-							},
-						})
-					}
-				/>
-			</DialogContent>
-		</Dialog>
+							<option value="">No stage</option>
+							{project.stages.map((s) => (
+								<option key={s.id} value={s.id}>
+									{s.name}
+								</option>
+							))}
+						</NativeSelect>
+					</Field>
+					<div className="flex gap-2">
+						<Button type="submit" variant="outline" disabled={update.isPending}>
+							Save
+						</Button>
+						<Button
+							type="button"
+							variant="ghost"
+							size="icon"
+							aria-label="Delete photo"
+							onClick={() => setDeleting(true)}
+						>
+							<Trash2 aria-hidden />
+						</Button>
+					</div>
+				</form>
+			) : (
+				photo.caption && <p>{photo.caption}</p>
+			)}
+			<ConfirmDialog
+				open={deleting}
+				onOpenChange={setDeleting}
+				title="Delete this photo?"
+				description="It's removed from the project. An admin can ask for it to be recovered from storage."
+				confirmLabel="Delete photo"
+				destructive
+				pending={remove.isPending}
+				onConfirm={() =>
+					remove.mutate(photo.id, {
+						onSuccess: () => {
+							setDeleting(false);
+							onClose();
+						},
+					})
+				}
+			/>
+		</FileViewer>
 	);
 }
 

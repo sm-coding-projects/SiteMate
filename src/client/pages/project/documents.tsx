@@ -1,7 +1,17 @@
-import { Download, EllipsisVertical, ExternalLink, FilePlus2, FileText, Pencil, Trash2 } from "lucide-react";
+import {
+	Download,
+	EllipsisVertical,
+	ExternalLink,
+	Eye,
+	FilePlus2,
+	FileText,
+	Pencil,
+	Trash2,
+} from "lucide-react";
 import { useRef, useState } from "react";
 import { Link } from "react-router";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { FileViewer, useOpenFile } from "@/components/file-viewer";
 import { LoadMore, QueryError } from "@/components/query-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,7 +32,7 @@ import {
 import { Field, Input, NativeSelect } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CATEGORY_LABEL, UploadDialog } from "@/components/upload-dialog";
-import { useDeleteFile, useFiles, useFileUrl, useUpdateFile } from "@/hooks/use-data";
+import { useDeleteFile, useFiles, useUpdateFile } from "@/hooks/use-data";
 import { useUploads } from "@/hooks/use-uploads";
 import { errorMessage } from "@/lib/api";
 import { formatBytes, formatDate, nbHyphen } from "@/lib/format";
@@ -46,6 +56,7 @@ export function DocumentsTab() {
 	const uploads = useUploads(project.id).filter((u) => u.category !== "photo");
 	const [picked, setPicked] = useState<File[]>([]);
 	const inputRef = useRef<HTMLInputElement>(null);
+	const [openIndex, setOpenIndex] = useState<number | null>(null);
 	const docs = files.data?.pages.flatMap((p) => p.items) ?? [];
 
 	return (
@@ -110,40 +121,44 @@ export function DocumentsTab() {
 			) : (
 				<>
 					<ul className="divide-y rounded-md border bg-card">
-						{docs.map((d) => (
-							<DocumentRow key={d.id} doc={d} />
+						{docs.map((d, i) => (
+							<DocumentRow key={d.id} doc={d} onOpen={() => setOpenIndex(i)} />
 						))}
 					</ul>
 					<LoadMore {...files} />
 				</>
 			)}
 			<UploadDialog project={project} kind="documents" files={picked} onDone={() => setPicked([])} />
+			{openIndex !== null && docs[openIndex] && (
+				<FileViewer
+					files={docs}
+					index={openIndex}
+					onIndex={setOpenIndex}
+					onClose={() => setOpenIndex(null)}
+					meta={<DocumentMeta doc={docs[openIndex]} />}
+				/>
+			)}
 		</div>
 	);
 }
 
-function DocumentRow({ doc }: { doc: FileEntry }) {
+function DocumentMeta({ doc }: { doc: FileEntry }) {
+	return (
+		<>
+			<span className="normal-case">{doc.filename}</span> · {CATEGORY_LABEL[doc.category]} ·{" "}
+			{formatBytes(doc.sizeBytes)}
+		</>
+	);
+}
+
+/** One document. Clicking it opens the viewer; a new tab or download is an explicit menu choice. */
+function DocumentRow({ doc, onOpen }: { doc: FileEntry; onOpen: () => void }) {
 	const { isAdmin } = useProjectContext();
-	const getUrl = useFileUrl();
-	const [error, setError] = useState<string | null>(null);
+	const { open, error } = useOpenFile();
 	const [editing, setEditing] = useState(false);
 	const [deleting, setDeleting] = useState(false);
 	const { project } = useProjectContext();
 	const remove = useDeleteFile(project.id);
-
-	const open = async (download: boolean) => {
-		setError(null);
-		// Open the tab synchronously (popup blockers), then point it at the signed URL.
-		const w = download ? null : window.open("about:blank", "_blank");
-		try {
-			const { url } = await getUrl(doc.id, download);
-			if (w) w.location.href = url;
-			else window.location.href = url;
-		} catch (e) {
-			w?.close();
-			setError(errorMessage(e));
-		}
-	};
 
 	return (
 		<li className="flex items-start gap-3 px-4 py-3 md:px-5">
@@ -160,7 +175,7 @@ function DocumentRow({ doc }: { doc: FileEntry }) {
 			<div className="min-w-0 flex-1">
 				<button
 					type="button"
-					onClick={() => open(false)}
+					onClick={onOpen}
 					className="max-w-full truncate text-left font-medium underline-offset-4 hover:underline"
 				>
 					{doc.filename}
@@ -197,10 +212,13 @@ function DocumentRow({ doc }: { doc: FileEntry }) {
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" className="w-52">
-					<DropdownMenuItem className="min-h-11" onSelect={() => open(false)}>
-						<ExternalLink aria-hidden /> Open
+					<DropdownMenuItem className="min-h-11" onSelect={onOpen}>
+						<Eye aria-hidden /> View
 					</DropdownMenuItem>
-					<DropdownMenuItem className="min-h-11" onSelect={() => open(true)}>
+					<DropdownMenuItem className="min-h-11" onSelect={() => open(doc.id)}>
+						<ExternalLink aria-hidden /> Open in new tab
+					</DropdownMenuItem>
+					<DropdownMenuItem className="min-h-11" onSelect={() => open(doc.id, { download: true })}>
 						<Download aria-hidden /> Download
 					</DropdownMenuItem>
 					{isAdmin && (

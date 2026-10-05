@@ -1,6 +1,7 @@
 import { Check, FileText, ImageIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
+import { FileViewer } from "@/components/file-viewer";
 import { QueryError } from "@/components/query-state";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,32 +14,16 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useFiles, useFileUrl, useSetItemFiles } from "@/hooks/use-data";
+import { useFiles, useSetItemFiles } from "@/hooks/use-data";
 import { errorMessage } from "@/lib/api";
 import { formatDate, nbHyphen } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { FileEntry, ItemAttachment, ProjectItem } from "../../shared/api-types";
 
-/** Opens a file's signed URL in a new tab (the tab is opened first so popup blockers allow it). */
-function useOpenFile() {
-	const getUrl = useFileUrl();
-	const [error, setError] = useState<string | null>(null);
-	const open = async (fileId: string) => {
-		setError(null);
-		const w = window.open("about:blank", "_blank");
-		try {
-			const { url } = await getUrl(fileId);
-			if (w) w.location.href = url;
-			else window.location.href = url;
-		} catch (e) {
-			w?.close();
-			setError(errorMessage(e));
-		}
-	};
-	return { open, error };
-}
-
-/** The files backing a check: photo thumbnails, then document names. Everyone can open them. */
+/**
+ * The files backing a check: photo thumbnails, then document names. Everyone can open them; they open in
+ * the file viewer, which steps through all of this check's attachments.
+ */
 export function ItemAttachments({
 	attachments,
 	className,
@@ -46,18 +31,21 @@ export function ItemAttachments({
 	attachments: ItemAttachment[];
 	className?: string;
 }) {
-	const { open, error } = useOpenFile();
+	const [openIndex, setOpenIndex] = useState<number | null>(null);
 	if (attachments.length === 0) return null;
 	const photos = attachments.filter((a) => a.category === "photo");
 	const docs = attachments.filter((a) => a.category !== "photo");
+	// Viewer order matches what's on screen: photos, then documents.
+	const ordered = [...photos, ...docs];
+	const viewerFiles = ordered.map((a) => ({ id: a.fileId, filename: a.filename, mimeType: a.mimeType }));
 	return (
 		<div className={className}>
 			<ul aria-label="Attached files" className="flex flex-wrap items-center gap-1.5">
-				{photos.map((a) => (
+				{photos.map((a, i) => (
 					<li key={a.fileId}>
 						<button
 							type="button"
-							onClick={() => open(a.fileId)}
+							onClick={() => setOpenIndex(i)}
 							aria-label={`Open photo ${a.filename}`}
 							className="block size-11 overflow-hidden rounded-[3px] border bg-muted outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring"
 						>
@@ -69,11 +57,11 @@ export function ItemAttachments({
 						</button>
 					</li>
 				))}
-				{docs.map((a) => (
+				{docs.map((a, i) => (
 					<li key={a.fileId} className="min-w-0 max-w-full">
 						<button
 							type="button"
-							onClick={() => open(a.fileId)}
+							onClick={() => setOpenIndex(photos.length + i)}
 							className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-md border bg-card px-2.5 text-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring pointer-fine:min-h-8"
 						>
 							<FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
@@ -82,7 +70,14 @@ export function ItemAttachments({
 					</li>
 				))}
 			</ul>
-			{error && <p className="mt-1 text-sm text-destructive">{error}</p>}
+			{openIndex !== null && viewerFiles[openIndex] && (
+				<FileViewer
+					files={viewerFiles}
+					index={openIndex}
+					onIndex={setOpenIndex}
+					onClose={() => setOpenIndex(null)}
+				/>
+			)}
 		</div>
 	);
 }

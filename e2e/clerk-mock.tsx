@@ -5,7 +5,9 @@
 import type { ReactNode } from "react";
 
 export const ClerkProvider = ({ children }: { children: ReactNode }) => <>{children}</>;
-export const useAuth = () => ({ isLoaded: true, isSignedIn: true, getToken: async () => "e2e-token" });
+// One function for the whole session, as Clerk's own getToken is: hooks depend on its identity.
+const getToken = async () => "e2e-token";
+export const useAuth = () => ({ isLoaded: true, isSignedIn: true, getToken });
 export const useUser = () => ({
 	isLoaded: true,
 	user: {
