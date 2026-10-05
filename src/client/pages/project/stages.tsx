@@ -167,8 +167,9 @@ export function StagesTab() {
 										/>
 									)}
 								</button>
-								{/* Phones: the checklist opens in place under its stage. */}
-								{!desktop && isSelected && <div className="pt-2 pb-6 pl-3">{panel}</div>}
+								{/* Phones: the checklist opens in place under its stage, indented to the stage names
+								    (px-3 + node + gap-3) so the survey line runs down the margin beside it. */}
+								{!desktop && isSelected && <div className="pt-2 pb-6 pl-9">{panel}</div>}
 							</li>
 						);
 					})}
