@@ -255,6 +255,19 @@ typecheck/lint/tests, applies remote migrations, uploads secrets from `.prod.var
 piped, never printed), sets R2 CORS, builds, deploys and calls `/api/health`. To redeploy code only: `pnpm run deploy`. (Note: plain `pnpm deploy` is pnpm's
 own workspace command, not this script.)
 
+### Redeploying after a merge
+
+```bash
+pnpm deploy:main
+```
+
+`scripts/deploy-main.sh` deploys whatever is on `origin/main`, from any folder or branch of this repo: it builds
+in a throwaway worktree of `origin/main` (your checkout is never touched), copies in `.env.production` from the
+main checkout, runs typecheck/lint/tests, applies any new remote migrations, builds, deploys with `APP_URL` from
+`wrangler.jsonc`, and checks `/api/health` and that the new build is being served. `pnpm deploy:main --dry-run`
+does everything except the migrations and the upload. It doesn't touch secrets or R2 CORS; that's
+`scripts/deploy.sh`.
+
 Watch the Worker and the queue consumer with `pnpm wrangler tail`.
 
 ## API
