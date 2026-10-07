@@ -14,7 +14,7 @@ Quote Q-1042 · Date 20/09/2026 · Valid 90 days
 Subtotal $30,000.00 · GST $3,000.00 · Total $33,000.00`;
 
 /** A stand-in for the Workers AI binding: toMarkdown + a JSON-mode model keyed on the schema it's asked for. */
-function fakeAi(opts: { failRun?: boolean; rejectSchema?: boolean } = {}) {
+function fakeAi(opts: { failRun?: boolean; rejectSchema?: boolean; markdown?: string } = {}) {
 	const calls: string[] = [];
 	const ai = {
 		calls,
@@ -26,14 +26,21 @@ function fakeAi(opts: { failRun?: boolean; rejectSchema?: boolean } = {}) {
 				mimeType: "application/pdf",
 				format: "markdown",
 				tokens: 100,
-				data: QUOTE_TEXT,
+				data: opts.markdown ?? QUOTE_TEXT,
 			};
 		},
 		async run(
 			_model: string,
-			input: { response_format?: { json_schema: { properties: Record<string, unknown> } } },
+			input: {
+				response_format?: { json_schema: { properties: Record<string, unknown> } };
+				messages?: { content: unknown }[];
+			},
 		) {
 			if (opts.failRun) throw new Error("AI unavailable");
+			if (Array.isArray(input.messages?.[0]?.content)) {
+				calls.push("transcribe");
+				return { response: QUOTE_TEXT };
+			}
 			const props = input.response_format?.json_schema.properties ?? {};
 			if ("documentType" in props) {
 				calls.push("classify");
@@ -66,8 +73,26 @@ function fakeAi(opts: { failRun?: boolean; rejectSchema?: boolean } = {}) {
 	return ai;
 }
 
-async function uploadQuote(projectId: string) {
-	const pdf = new TextEncoder().encode("%PDF-1.4 quote");
+/** A one-page PDF whose page is a JPEG, like a phone scanner app makes (the JPEG body is filler). */
+function scannedPdf() {
+	const jpeg = new Uint8Array(40 * 1024);
+	jpeg.set([0xff, 0xd8, 0xff, 0xe0]);
+	jpeg.set([0xff, 0xd9], jpeg.length - 2);
+	const enc = new TextEncoder();
+	const head = enc.encode(
+		"%PDF-1.7\n1 0 obj << /Type /Pages /Kids [2 0 R] /Count 1 >> endobj\n" +
+			"2 0 obj << /Type /Page /Parent 1 0 R /Resources << /XObject << /Im0 3 0 R >> >> >> endobj\n" +
+			`3 0 obj << /Type /XObject /Subtype /Image /Width 2328 /Height 3224 /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`,
+	);
+	const tail = enc.encode("\nendstream\nendobj\n%%EOF\n");
+	const pdf = new Uint8Array(head.length + jpeg.length + tail.length);
+	pdf.set(head);
+	pdf.set(jpeg, head.length);
+	pdf.set(tail, head.length + jpeg.length);
+	return pdf;
+}
+
+async function uploadQuote(projectId: string, pdf: Uint8Array = new TextEncoder().encode("%PDF-1.4 quote")) {
 	const t = await api<UploadTicket>(`/projects/${projectId}/files`, {
 		as: ADMIN,
 		method: "POST",
@@ -183,6 +208,25 @@ describe("AI extraction pipeline", () => {
 		});
 		const n = await env.DB.prepare("select count(*) n from suppliers").first<{ n: number }>();
 		expect(n?.n).toBe(1);
+	});
+
+	it("transcribes the page images of a scanned PDF whose text layer is junk", async () => {
+		const projectId = await createProject();
+		const extractionId = await uploadQuote(projectId, scannedPdf());
+		const ai = fakeAi({ markdown: "## Contents\n### Page 1\nI V 0 --\\ ~ r i u 'o V' 0-1 ~" });
+		await consume({ type: "extract", extractionId }, { ...env, AI: ai } as unknown as Bindings);
+		expect(ai.calls).toEqual(["toMarkdown", "transcribe", "classify", "extract"]);
+		const ex = await api<ExtractionDetail>(`/extractions/${extractionId}`, { as: ADMIN });
+		expect(ex.body.status).toBe("needs_review");
+		expect(ex.body.fields?.quote?.quoteNumber).toBe("Q-1042");
+	});
+
+	it("keeps the text layer of a scanned PDF that already has real text", async () => {
+		const projectId = await createProject();
+		const extractionId = await uploadQuote(projectId, scannedPdf());
+		const ai = fakeAi({ markdown: `${QUOTE_TEXT}\n${QUOTE_TEXT}` });
+		await consume({ type: "extract", extractionId }, { ...env, AI: ai } as unknown as Bindings);
+		expect(ai.calls).toEqual(["toMarkdown", "classify", "extract"]);
 	});
 
 	it("falls back to JSON mode when the model rejects the schema", async () => {
