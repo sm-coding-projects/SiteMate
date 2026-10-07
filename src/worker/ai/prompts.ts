@@ -189,8 +189,10 @@ ${text}
 </document>`;
 
 /** Images (scans, phone photos of paperwork) are transcribed first, then go through the same text prompts. */
-export const TRANSCRIBE_PROMPT =
-	"Transcribe all text in this image of a document, keeping tables as Markdown tables. Output only the transcription.";
+export const TRANSCRIBE_PROMPT = `Transcribe all text in this image of a document, keeping tables as Markdown tables.
+It may be handwritten: copy every number, price, date and phone number exactly as written, one line per line
+of writing, and keep the writer's own arithmetic (e.g. "150 x 307 = 46,050"). Write [?] for anything illegible.
+Output only the transcription.`;
 
 /** Keep prompts inside the model's context and the free-tier neuron budget. */
 export const MAX_DOCUMENT_CHARS = 60_000;

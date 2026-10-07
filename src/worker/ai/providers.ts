@@ -11,6 +11,7 @@ import type { Db } from "../db";
 import { decryptSecret } from "../lib/secret-box";
 import type { Bindings } from "../types";
 import { complete, type Endpoint, stripThinking } from "./endpoint";
+import { looksScanned, pdfPageCount, pdfPageJpegs } from "./pdf-scan";
 import { MAX_DOCUMENT_CHARS, SYSTEM_PROMPT, TRANSCRIBE_PROMPT } from "./prompts";
 
 export type ProviderName =
@@ -46,7 +47,8 @@ export interface Provider {
 }
 
 const isImage = (m: string) => m.startsWith("image/");
-const toBase64 = (bytes: ArrayBuffer) => Buffer.from(bytes).toString("base64");
+const toBase64 = (bytes: ArrayBuffer | Uint8Array) =>
+	Buffer.from(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)).toString("base64");
 
 /** Inline images and native PDFs are sent base64 in a single request; keep them modest. */
 const MAX_INLINE_BYTES = 5 * 1024 * 1024;
@@ -71,6 +73,53 @@ async function toMarkdown(env: Bindings, file: SourceFile) {
 	return res.data;
 }
 
+const DEFAULT_WORKERS_AI_MODEL = "@cf/meta/llama-4-scout-17b-16e-instruct";
+/** Scanned pages are transcribed one call each; cap the calls (and neurons) per document. */
+const MAX_SCANNED_PAGES = 8;
+
+/** Workers AI vision: one image → its text. */
+async function transcribeImage(env: Bindings, mimeType: string, bytes: ArrayBuffer | Uint8Array) {
+	if (bytes.byteLength > MAX_INLINE_BYTES) throw new Error("Image is too large to read (5 MB max)");
+	const model = (env.WORKERS_AI_MODEL || DEFAULT_WORKERS_AI_MODEL) as typeof DEFAULT_WORKERS_AI_MODEL;
+	const out = await env.AI.run(
+		model,
+		{
+			messages: [
+				{
+					role: "user",
+					content: [
+						{ type: "text", text: TRANSCRIBE_PROMPT },
+						{ type: "image_url", image_url: { url: `data:${mimeType};base64,${toBase64(bytes)}` } },
+					],
+				},
+			],
+			max_tokens: 4096,
+			temperature: 0,
+		},
+		gatewayOptions(env, { step: "transcribe" }),
+	);
+	return String((out as { response?: unknown }).response ?? "");
+}
+
+/**
+ * Any non-PDF-native provider's file → text. PDFs use their text layer, unless it's a scan (every page an
+ * image, next to no real words), when the page images are transcribed like a photo would be.
+ */
+async function toText(env: Bindings, file: SourceFile): Promise<DocumentInput> {
+	if (isImage(file.mimeType)) return truncate(await transcribeImage(env, file.mimeType, file.bytes));
+	const markdown = await toMarkdown(env, file);
+	if (file.mimeType !== "application/pdf") return truncate(markdown);
+	const pages = pdfPageCount(file.bytes);
+	const jpegs = pdfPageJpegs(file.bytes);
+	if (jpegs.length === 0 || jpegs.length < pages || !looksScanned(markdown, pages)) return truncate(markdown);
+	const texts: string[] = [];
+	for (const [i, jpeg] of jpegs.slice(0, MAX_SCANNED_PAGES).entries()) {
+		texts.push(`## Page ${i + 1}\n\n${await transcribeImage(env, "image/jpeg", jpeg)}`);
+	}
+	const input = truncate(texts.join("\n\n"));
+	return input.kind === "text" && jpegs.length > MAX_SCANNED_PAGES ? { ...input, truncated: true } : input;
+}
+
 /** Strips ```json fences and parses; some models wrap JSON even in JSON mode. */
 export function parseJsonLoose(value: unknown): unknown {
 	if (typeof value !== "string") return value;
@@ -90,35 +139,11 @@ export function parseJsonLoose(value: unknown): unknown {
 // ── Workers AI (default, free tier) ──────────────────────────────────────────
 
 function workersAi(env: Bindings): Provider {
-	const model = (env.WORKERS_AI_MODEL ||
-		"@cf/meta/llama-4-scout-17b-16e-instruct") as "@cf/meta/llama-4-scout-17b-16e-instruct";
+	const model = (env.WORKERS_AI_MODEL || DEFAULT_WORKERS_AI_MODEL) as typeof DEFAULT_WORKERS_AI_MODEL;
 	return {
 		name: "workers-ai",
 		model,
-		async prepare(file) {
-			if (!isImage(file.mimeType)) return truncate(await toMarkdown(env, file));
-			if (file.bytes.byteLength > MAX_INLINE_BYTES) throw new Error("Image is too large to read (5 MB max)");
-			const out = await env.AI.run(
-				model,
-				{
-					messages: [
-						{
-							role: "user",
-							content: [
-								{ type: "text", text: TRANSCRIBE_PROMPT },
-								{
-									type: "image_url",
-									image_url: { url: `data:${file.mimeType};base64,${toBase64(file.bytes)}` },
-								},
-							],
-						},
-					],
-					max_tokens: 4096,
-				},
-				gatewayOptions(env, { step: "transcribe" }),
-			);
-			return truncate(String((out as { response?: unknown }).response ?? ""));
-		},
+		prepare: (file) => toText(env, file),
 		async json(input, prompt, schemaName, schema) {
 			if (input.kind !== "text") throw new Error("Workers AI needs text input");
 			const messages = [
@@ -178,11 +203,8 @@ function anthropic(env: Bindings, apiKey: string): Provider {
 			if (file.mimeType === "application/pdf" && file.bytes.byteLength <= MAX_INLINE_BYTES) {
 				return { kind: "pdf", base64: toBase64(file.bytes) };
 			}
-			if (isImage(file.mimeType)) {
-				// Images go through Workers AI transcription so this provider and the default behave the same.
-				return workersAi(env).prepare(file);
-			}
-			return truncate(await toMarkdown(env, file));
+			// Images go through Workers AI transcription so this provider and the default behave the same.
+			return toText(env, file);
 		},
 		async json(input, prompt, _schemaName, schema) {
 			const c = await getClient();
@@ -229,10 +251,7 @@ function openaiCompatible(env: Bindings, apiKey: string): Provider {
 	return {
 		name: "openai-compatible",
 		model,
-		async prepare(file) {
-			if (isImage(file.mimeType)) return workersAi(env).prepare(file);
-			return truncate(await toMarkdown(env, file));
-		},
+		prepare: (file) => toText(env, file),
 		async json(input, prompt, schemaName, schema) {
 			if (input.kind !== "text") throw new Error("OpenAI-compatible provider needs text input");
 			const res = await fetch(`${await baseUrl()}/chat/completions`, {
@@ -267,11 +286,8 @@ function custom(env: Bindings, endpoint: Endpoint, model: string): Provider {
 	return {
 		name: endpoint.protocol === "anthropic" ? "custom-anthropic" : "custom-openai",
 		model,
-		async prepare(file) {
-			// File → text stays on Workers AI (free); the configured model does all the reading and reasoning.
-			if (isImage(file.mimeType)) return workersAi(env).prepare(file);
-			return truncate(await toMarkdown(env, file));
-		},
+		// File → text stays on Workers AI (free); the configured model does all the reading and reasoning.
+		prepare: (file) => toText(env, file),
 		async json(input, prompt, schemaName, schema) {
 			if (input.kind !== "text") throw new Error("The configured model needs text input");
 			const text = await complete(endpoint, model, {
