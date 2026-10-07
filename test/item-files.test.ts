@@ -128,4 +128,80 @@ describe("checklist item attachments", () => {
 			.first<{ n: number }>();
 		expect(links?.n).toBe(0);
 	});
+
+	it("moves a file to a check in another stage, and removes one from a check", async () => {
+		const projectId = await createProject("Move St");
+		const plan = await addFile(projectId, "plan", "Structural drawings.pdf");
+		const quote = await addFile(projectId, "quote", "Concrete quote.pdf");
+		const p = (await api<ProjectDetail>(`/projects/${projectId}`, { as: ADMIN })).body;
+		const [contract, engineering] = [p.stages[0]?.items[0], p.stages[0]?.items.at(-1)];
+		const frame = p.stages[3]?.items[0];
+		if (!contract || !engineering || !frame) throw new Error("fixture");
+		await attach(contract.id, [plan, quote]);
+
+		const moved = await api(`/items/${contract.id}/files/${plan}/move`, {
+			as: ADMIN,
+			method: "POST",
+			body: { itemId: engineering.id },
+		});
+		expect(moved.status).toBe(200);
+		// Into a check that already has it: just leaves the source.
+		await attach(frame.id, [quote]);
+		expect(
+			(
+				await api(`/items/${contract.id}/files/${quote}/move`, {
+					as: ADMIN,
+					method: "POST",
+					body: { itemId: frame.id },
+				})
+			).status,
+		).toBe(200);
+
+		const files = async (id: string) =>
+			(await api<ProjectDetail>(`/projects/${projectId}`, { as: ADMIN })).body.stages
+				.flatMap((s) => s.items)
+				.find((i) => i.id === id)
+				?.attachments.map((a) => a.fileId);
+		expect(await files(contract.id)).toEqual([]);
+		expect(await files(engineering.id)).toEqual([plan]);
+		expect(await files(frame.id)).toEqual([quote]);
+
+		const removed = await api(`/items/${engineering.id}/files/${plan}`, { as: ADMIN, method: "DELETE" });
+		expect(removed.status).toBe(200);
+		expect(await files(engineering.id)).toEqual([]);
+		// The file itself stays in the project.
+		const kept = await env.DB.prepare("SELECT deleted_at FROM files WHERE id = ?")
+			.bind(plan)
+			.first<{ deleted_at: number | null }>();
+		expect(kept).toEqual({ deleted_at: null });
+
+		const feed = await api<Page<ActivityEntry>>(`/projects/${projectId}/activity`, { as: VIEWER });
+		expect(feed.body.items.map((e) => [e.action, e.meta?.file])).toEqual(
+			expect.arrayContaining([
+				["item.file_moved", "Structural drawings.pdf"],
+				["item.files_detached", "Structural drawings.pdf"],
+			]),
+		);
+	});
+
+	it("only moves or removes files that are on the check, within the project, as an admin", async () => {
+		const projectId = await createProject("Guard St");
+		const other = await createProject("Elsewhere St");
+		const f = await addFile(projectId, "document", "a.pdf");
+		const item = await firstItem(projectId);
+		const foreignItem = await firstItem(other);
+		const p = (await api<ProjectDetail>(`/projects/${projectId}`, { as: ADMIN })).body;
+		const second = p.stages[0]?.items[1];
+		if (!second) throw new Error("fixture");
+
+		expect((await api(`/items/${item.id}/files/${f}`, { as: ADMIN, method: "DELETE" })).status).toBe(404);
+		await attach(item.id, [f]);
+		const move = (to: string, as = ADMIN) =>
+			api(`/items/${item.id}/files/${f}/move`, { as, method: "POST", body: { itemId: to } });
+		expect((await move(foreignItem.id)).status).toBe(400);
+		expect((await move(item.id)).status).toBe(400);
+		expect((await move(second.id, VIEWER)).status).toBe(403);
+		expect((await api(`/items/${item.id}/files/${f}`, { as: VIEWER, method: "DELETE" })).status).toBe(403);
+		expect((await firstItem(projectId)).attachments.map((a) => a.fileId)).toEqual([f]);
+	});
 });

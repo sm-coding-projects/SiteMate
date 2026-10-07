@@ -354,6 +354,11 @@ function ReviewForm({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
 	);
 	const suggested = e.stages.find((s) => s.name === e.fields?.suggestedStage);
 	const [stageId, setStageId] = useState(suggested?.id ?? "");
+	const checklist = e.stages.find((s) => s.id === stageId)?.items ?? [];
+	// The AI's pick only applies in the stage it was made for.
+	const suggestedItem =
+		stageId === suggested?.id ? checklist.find((i) => i.title === e.fields?.suggestedItem) : undefined;
+	const [itemId, setItemId] = useState(suggestedItem?.id ?? "");
 	const [supplierId, setSupplierId] = useState<string>(e.fields?.supplierMatch?.id ?? "");
 	const [error, setError] = useState<string | null>(null);
 
@@ -406,6 +411,7 @@ function ReviewForm({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
 					},
 					supplierId: supplierId || null,
 					stageId: stageId || null,
+					itemId: itemId || null,
 				},
 				{
 					onSuccess: () => navigate(`/projects/${e.project.id}/quotes`),
@@ -414,7 +420,7 @@ function ReviewForm({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
 			);
 		} else {
 			confirm.mutate(
-				{ documentType: type, fields: generic, stageId: stageId || null },
+				{ documentType: type, fields: generic, stageId: stageId || null, itemId: itemId || null },
 				{
 					onSuccess: () => navigate(`/projects/${e.project.id}/documents`),
 					onError: (err) => setError(errorMessage(err)),
@@ -449,7 +455,14 @@ function ReviewForm({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
 						</NativeSelect>
 					</Field>
 					<Field id="rv-stage" label="Stage" hint={suggested ? `Suggested: ${suggested.name}` : undefined}>
-						<NativeSelect id="rv-stage" value={stageId} onChange={(ev) => setStageId(ev.target.value)}>
+						<NativeSelect
+							id="rv-stage"
+							value={stageId}
+							onChange={(ev) => {
+								setStageId(ev.target.value);
+								setItemId("");
+							}}
+						>
 							<option value="">No stage</option>
 							{e.stages.map((s) => (
 								<option key={s.id} value={s.id}>
@@ -459,6 +472,26 @@ function ReviewForm({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
 						</NativeSelect>
 					</Field>
 				</div>
+				{stageId && (
+					<Field
+						id="rv-item"
+						label="Checklist item"
+						hint={
+							suggestedItem
+								? `Suggested: ${suggestedItem.title}. Confirming attaches the file to it.`
+								: "Confirming attaches the file to this check."
+						}
+					>
+						<NativeSelect id="rv-item" value={itemId} onChange={(ev) => setItemId(ev.target.value)}>
+							<option value="">Don’t attach to a check</option>
+							{checklist.map((i) => (
+								<option key={i.id} value={i.id}>
+									{i.title}
+								</option>
+							))}
+						</NativeSelect>
+					</Field>
+				)}
 
 				{type === "quote" ? (
 					<>

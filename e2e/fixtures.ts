@@ -377,6 +377,7 @@ export function installApi(page: Page, role: "admin" | "viewer", opts: { slowIte
 						fields: {
 							documentType: "quote",
 							suggestedStage: "Frame",
+							suggestedItem: "Frame inspection",
 							quote: {
 								supplierName: "Harbour Frames Pty Ltd",
 								abn: "51 824 753 556",
@@ -400,7 +401,12 @@ export function installApi(page: Page, role: "admin" | "viewer", opts: { slowIte
 						reviewedBy: null,
 						reviewedAt: null,
 						quoteId: null,
-						stages: project.stages.map(({ id, name, status }) => ({ id, name, status })),
+						stages: project.stages.map(({ id, name, status, items }) => ({
+							id,
+							name,
+							status,
+							items: items.map(({ id, title }) => ({ id, title })),
+						})),
 					});
 				if (path === "/files/f1/url") return json(route, { url: "about:blank", expiresAt: NOW + DAY });
 				if (path.startsWith("/files/")) return json(route, { url: thumb(10), expiresAt: NOW + DAY });

@@ -1,6 +1,12 @@
 import { createExecutionContext, createMessageBatch, env, getQueueResult } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
-import type { ExtractionDetail, JobMessage, ProjectQuotes, UploadTicket } from "../src/shared/api-types";
+import type {
+	ExtractionDetail,
+	JobMessage,
+	ProjectDetail,
+	ProjectQuotes,
+	UploadTicket,
+} from "../src/shared/api-types";
 import { handleQueue } from "../src/worker/queue";
 import type { Bindings } from "../src/worker/types";
 import { ADMIN, api, createProject, VIEWER } from "./helpers";
@@ -45,7 +51,12 @@ function fakeAi(opts: { failRun?: boolean; rejectSchema?: boolean; markdown?: st
 			if ("documentType" in props) {
 				calls.push("classify");
 				return {
-					response: JSON.stringify({ documentType: "quote", confidence: 0.93, suggestedStage: "frame" }),
+					response: JSON.stringify({
+						documentType: "quote",
+						confidence: 0.93,
+						suggestedStage: "frame",
+						suggestedItem: "frame inspection",
+					}),
 				};
 			}
 			calls.push("extract");
@@ -135,6 +146,10 @@ describe("AI extraction pipeline", () => {
 		expect(ex.body.provider).toBe("workers-ai");
 		expect(ex.body.confidence).toBe(93);
 		expect(ex.body.fields?.suggestedStage).toBe("Frame");
+		expect(ex.body.fields?.suggestedItem).toBe("Frame inspection");
+		const frame = ex.body.stages.find((st) => st.name === "Frame");
+		const check = frame?.items.find((i) => i.title === "Frame inspection");
+		if (!frame || !check) throw new Error("no Frame checklist");
 		expect(ex.body.fields?.quote).toMatchObject({
 			amountExGstCents: 3_000_000,
 			gstCents: 250_000,
@@ -170,9 +185,14 @@ describe("AI extraction pipeline", () => {
 		const confirm = await api<{ quoteId: string }>(`/extractions/${extractionId}/confirm`, {
 			as: ADMIN,
 			method: "POST",
-			body: { documentType: "quote", fields },
+			body: { documentType: "quote", fields, stageId: frame.id, itemId: check.id },
 		});
 		expect(confirm.status).toBe(200);
+		const project = await api<ProjectDetail>(`/projects/${projectId}`, { as: ADMIN });
+		const attached = project.body.stages.flatMap((st) => st.items).filter((i) => i.attachments.length);
+		expect(attached.map((i) => [i.title, i.attachments[0]?.filename])).toEqual([
+			["Frame inspection", "Harbour Frames Q-1042.pdf"],
+		]);
 		const supplier = await env.DB.prepare("select name, abn, trade from suppliers").first();
 		expect(supplier).toMatchObject({ name: "Harbour Frames Pty Ltd", abn: "51824753556", trade: "Framing" });
 

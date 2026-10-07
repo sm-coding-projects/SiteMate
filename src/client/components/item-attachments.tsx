@@ -1,4 +1,4 @@
-import { Check, FileText, ImageIcon } from "lucide-react";
+import { ArrowRightLeft, Check, EllipsisVertical, FileText, ImageIcon, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
 import { FileViewer } from "@/components/file-viewer";
@@ -13,12 +13,26 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Field, NativeSelect } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useFiles, useSetItemFiles } from "@/hooks/use-data";
+import { useDetachItemFile, useFiles, useMoveItemFile, useSetItemFiles } from "@/hooks/use-data";
 import { errorMessage } from "@/lib/api";
 import { formatDate, nbHyphen } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { FileEntry, ItemAttachment, ProjectItem } from "../../shared/api-types";
+import type { FileEntry, ItemAttachment, ProjectItem, ProjectStage } from "../../shared/api-types";
+
+/** What admins need to move a file to another check or take it off this one. */
+interface ManageFiles {
+	projectId: string;
+	item: ProjectItem;
+	stages: ProjectStage[];
+}
 
 /**
  * The files backing a check: photo thumbnails, then document names. Everyone can open them; they open in
@@ -26,12 +40,25 @@ import type { FileEntry, ItemAttachment, ProjectItem } from "../../shared/api-ty
  */
 export function ItemAttachments({
 	attachments,
+	manage,
 	className,
 }: {
 	attachments: ItemAttachment[];
+	/** Admins: each file gets a menu to move it to another check or remove it from this one. */
+	manage?: ManageFiles;
 	className?: string;
 }) {
 	const [openIndex, setOpenIndex] = useState<number | null>(null);
+	const [moving, setMoving] = useState<ItemAttachment | null>(null);
+	const detach = useDetachItemFile(manage?.projectId ?? "");
+	const actions = (a: ItemAttachment) =>
+		manage && (
+			<FileMenu
+				filename={a.filename}
+				onMove={() => setMoving(a)}
+				onRemove={() => detach.mutate({ id: manage.item.id, fileId: a.fileId })}
+			/>
+		);
 	if (attachments.length === 0) return null;
 	const photos = attachments.filter((a) => a.category === "photo");
 	const docs = attachments.filter((a) => a.category !== "photo");
@@ -42,7 +69,7 @@ export function ItemAttachments({
 		<div className={className}>
 			<ul aria-label="Attached files" className="flex flex-wrap items-center gap-1.5">
 				{photos.map((a, i) => (
-					<li key={a.fileId}>
+					<li key={a.fileId} className="flex items-center">
 						<button
 							type="button"
 							onClick={() => setOpenIndex(i)}
@@ -55,21 +82,43 @@ export function ItemAttachments({
 								<ImageIcon className="m-auto size-5 text-muted-foreground" aria-hidden />
 							)}
 						</button>
+						{actions(a)}
 					</li>
 				))}
 				{docs.map((a, i) => (
-					<li key={a.fileId} className="min-w-0 max-w-full">
+					<li
+						key={a.fileId}
+						className="inline-flex min-w-0 max-w-full items-center rounded-md border bg-card"
+					>
 						<button
 							type="button"
 							onClick={() => setOpenIndex(photos.length + i)}
-							className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-md border bg-card px-2.5 text-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring pointer-fine:min-h-8"
+							className={cn(
+								"inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md px-2.5 text-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-ring pointer-fine:min-h-8",
+								manage && "pr-1",
+							)}
 						>
 							<FileText className="size-4 shrink-0 text-muted-foreground" aria-hidden />
 							<span className="truncate">{a.filename}</span>
 						</button>
+						{actions(a)}
 					</li>
 				))}
 			</ul>
+			{detach.isError && (
+				<p role="alert" className="mt-2 text-sm text-destructive">
+					{errorMessage(detach.error)}
+				</p>
+			)}
+			{manage && (
+				<MoveFileDialog
+					file={moving}
+					onClose={() => setMoving(null)}
+					projectId={manage.projectId}
+					from={manage.item}
+					stages={manage.stages}
+				/>
+			)}
 			{openIndex !== null && viewerFiles[openIndex] && (
 				<FileViewer
 					files={viewerFiles}
@@ -79,6 +128,107 @@ export function ItemAttachments({
 				/>
 			)}
 		</div>
+	);
+}
+
+function FileMenu({
+	filename,
+	onMove,
+	onRemove,
+}: {
+	filename: string;
+	onMove: () => void;
+	onRemove: () => void;
+}) {
+	return (
+		<DropdownMenu>
+			<DropdownMenuTrigger asChild>
+				<Button
+					variant="ghost"
+					size="icon"
+					className="size-11 pointer-fine:size-8"
+					aria-label={`Actions for ${filename}`}
+				>
+					<EllipsisVertical aria-hidden />
+				</Button>
+			</DropdownMenuTrigger>
+			<DropdownMenuContent align="end" className="w-60">
+				<DropdownMenuItem className="min-h-11" onSelect={onMove}>
+					<ArrowRightLeft aria-hidden /> Move to another check…
+				</DropdownMenuItem>
+				<DropdownMenuItem className="min-h-11" onSelect={onRemove}>
+					<X aria-hidden /> Remove from this check
+				</DropdownMenuItem>
+			</DropdownMenuContent>
+		</DropdownMenu>
+	);
+}
+
+/** Picks the check (in any stage of the project) to move a file to. */
+function MoveFileDialog({
+	file,
+	onClose,
+	projectId,
+	from,
+	stages,
+}: {
+	file: ItemAttachment | null;
+	onClose: () => void;
+	projectId: string;
+	from: ProjectItem;
+	stages: ProjectStage[];
+}) {
+	const [to, setTo] = useState("");
+	const move = useMoveItemFile(projectId);
+	// biome-ignore lint/correctness/useExhaustiveDependencies: reset each time a file is picked
+	useEffect(() => {
+		setTo("");
+		move.reset();
+	}, [file]);
+	return (
+		<Dialog open={file !== null} onOpenChange={(open) => !open && onClose()}>
+			<DialogContent>
+				<DialogHeader>
+					<DialogTitle>Move to another check</DialogTitle>
+					<DialogDescription>
+						{file?.filename} moves off “{from.title}”. It stays in the project’s files either way.
+					</DialogDescription>
+				</DialogHeader>
+				<DialogBody>
+					<Field id="move-to" label="Check" error={move.isError ? errorMessage(move.error) : null}>
+						<NativeSelect id="move-to" value={to} onChange={(e) => setTo(e.target.value)}>
+							<option value="" disabled>
+								Choose a check
+							</option>
+							{stages.map((s) => (
+								<optgroup key={s.id} label={s.name}>
+									{s.items
+										.filter((i) => i.id !== from.id)
+										.map((i) => (
+											<option key={i.id} value={i.id}>
+												{i.title}
+											</option>
+										))}
+								</optgroup>
+							))}
+						</NativeSelect>
+					</Field>
+				</DialogBody>
+				<DialogFooter>
+					<Button variant="outline" onClick={onClose}>
+						Cancel
+					</Button>
+					<Button
+						disabled={!to || !file || move.isPending}
+						onClick={() =>
+							file && move.mutate({ id: from.id, fileId: file.fileId, itemId: to }, { onSuccess: onClose })
+						}
+					>
+						{move.isPending ? "Moving…" : "Move"}
+					</Button>
+				</DialogFooter>
+			</DialogContent>
+		</Dialog>
 	);
 }
 

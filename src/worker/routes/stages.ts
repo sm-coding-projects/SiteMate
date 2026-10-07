@@ -7,6 +7,8 @@ import { applyManualStatus, deriveStageStatus, type StageState } from "../../sha
 import {
 	idParam,
 	itemCreate,
+	itemFileMove,
+	itemFileParam,
 	itemFilesUpdate,
 	itemUpdate,
 	reorderBody,
@@ -37,6 +39,18 @@ async function loadItem(db: Db, itemId: string) {
 		.where(eq(projectItems.id, itemId))
 		.get();
 	if (!row) throw notFound("Checklist item not found");
+	return row;
+}
+
+/** The file, if it's attached to this check. */
+async function attachedFile(db: Db, itemId: string, fileId: string) {
+	const row = await db
+		.select({ filename: files.filename })
+		.from(itemFiles)
+		.innerJoin(files, eq(itemFiles.fileId, files.id))
+		.where(and(eq(itemFiles.itemId, itemId), eq(itemFiles.fileId, fileId)))
+		.get();
+	if (!row) throw notFound("That file isn't attached to this check");
 	return row;
 }
 
@@ -499,6 +513,80 @@ export const itemRoutes = new Hono<AppEnv>()
 		await runBatch(db, statements);
 		return c.json({ id, fileIds: wanted, changed: true });
 	})
+
+	// Takes one file off this check. The file itself stays in the project.
+	.delete("/:id/files/:fileId", requireRole("admin"), zv("param", itemFileParam), async (c) => {
+		const db = c.get("db");
+		const user = c.get("user");
+		const { id, fileId } = c.req.valid("param");
+		const { item, stage } = await loadItem(db, id);
+		const file = await attachedFile(db, id, fileId);
+		const now = Date.now();
+		await runBatch(db, [
+			db.delete(itemFiles).where(and(eq(itemFiles.itemId, id), eq(itemFiles.fileId, fileId))),
+			touchProject(db, stage.projectId, now),
+			logActivity(
+				db,
+				{
+					projectId: stage.projectId,
+					actorId: user.id,
+					action: "item.files_detached",
+					entityType: "item",
+					entityId: id,
+					meta: { item: item.title, stage: stage.name, count: 1, file: file.filename },
+				},
+				now,
+			),
+		]);
+		return c.json({ id, fileId, removed: true });
+	})
+
+	// Moves one file from this check to another check in the same project (any stage).
+	.post(
+		"/:id/files/:fileId/move",
+		requireRole("admin"),
+		zv("param", itemFileParam),
+		zv("json", itemFileMove),
+		async (c) => {
+			const db = c.get("db");
+			const user = c.get("user");
+			const { id, fileId } = c.req.valid("param");
+			const { itemId: toId } = c.req.valid("json");
+			if (toId === id) throw badRequest("It's already on that check");
+			const [from, to] = await Promise.all([loadItem(db, id), loadItem(db, toId)]);
+			if (to.stage.projectId !== from.stage.projectId) throw badRequest("That check is in another project");
+			const file = await attachedFile(db, id, fileId);
+			const now = Date.now();
+			await runBatch(db, [
+				db.delete(itemFiles).where(and(eq(itemFiles.itemId, id), eq(itemFiles.fileId, fileId))),
+				// Already on the target check: the move just takes it off this one.
+				db
+					.insert(itemFiles)
+					.values({ itemId: toId, fileId, attachedBy: user.id, createdAt: now })
+					.onConflictDoNothing(),
+				touchProject(db, from.stage.projectId, now),
+				logActivity(
+					db,
+					{
+						projectId: from.stage.projectId,
+						actorId: user.id,
+						action: "item.file_moved",
+						entityType: "item",
+						entityId: toId,
+						meta: {
+							file: file.filename,
+							from: from.item.title,
+							fromStage: from.stage.name,
+							item: to.item.title,
+							stage: to.stage.name,
+						},
+					},
+					now,
+				),
+			]);
+			return c.json({ id: toId, fileId, moved: true });
+		},
+	)
 
 	.delete("/:id", requireRole("admin"), zv("param", idParam), async (c) => {
 		const db = c.get("db");

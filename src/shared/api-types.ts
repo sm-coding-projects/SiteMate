@@ -201,6 +201,8 @@ export interface SupplierMatch {
 export interface ExtractionFields {
 	documentType: DocumentType;
 	suggestedStage: string | null;
+	/** The checklist item (title, within suggestedStage) this document most likely backs. */
+	suggestedItem?: string | null;
 	quote?: QuoteFields;
 	generic?: GenericFields;
 	supplierMatch?: SupplierMatch | null;
@@ -226,7 +228,8 @@ export interface ExtractionDetail extends ExtractionSummary {
 	reviewedBy: { id: string; name: string | null } | null;
 	reviewedAt: number | null;
 	quoteId: string | null;
-	stages: StageLite[];
+	/** With each stage's checklist, so the reviewer can attach the file to a check. */
+	stages: (StageLite & { items: { id: string; title: string }[] })[];
 }
 
 export type QuoteStatus = "pending" | "accepted" | "rejected";

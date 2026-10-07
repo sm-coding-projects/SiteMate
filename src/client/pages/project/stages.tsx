@@ -415,7 +415,11 @@ function Checklist({ stage }: { stage: ProjectStage }) {
 								{isAdmin && <ItemMenu item={item} stage={stage} index={i} />}
 							</div>
 							{/* Outside the row's <label>, so opening a file never ticks the box. Indented to the title. */}
-							<ItemAttachments attachments={item.attachments} className="pr-4 pb-3 pl-[3.25rem]" />
+							<ItemAttachments
+								attachments={item.attachments}
+								manage={isAdmin ? { projectId: project.id, item, stages: project.stages } : undefined}
+								className="pr-4 pb-3 pl-[3.25rem]"
+							/>
 						</li>
 					))}
 				</ul>
