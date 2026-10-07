@@ -223,7 +223,7 @@ test.describe("admin interactions", () => {
 		await page.goto("/review/e1");
 		const type = page.getByLabel("Document type");
 		const stage = page.getByLabel("Stage", { exact: true });
-		await expect(page.getByText("Suggested: Frame")).toBeVisible();
+		await expect(page.getByText("Suggested: Frame", { exact: true })).toBeVisible();
 		const [a, b] = [await type.boundingBox(), await stage.boundingBox()];
 		expect(a?.y).toBe(b?.y);
 		if (SHOTS)
@@ -291,7 +291,9 @@ test.describe("checklist attachments", () => {
 			// Already attached: two photos on "Slab pour photos", a certificate on the termite check.
 			const attached = page.getByRole("list", { name: "Attached files" });
 			await expect(attached.first().getByRole("button", { name: /Open photo IMG_100[12]/ })).toHaveCount(2);
-			await expect(page.getByRole("button", { name: "Termite protection certificate.pdf" })).toBeVisible();
+			await expect(
+				page.getByRole("button", { name: "Termite protection certificate.pdf", exact: true }),
+			).toBeVisible();
 
 			await page.getByRole("button", { name: "Actions for Slab pour photos" }).click();
 			await page.getByRole("menuitem", { name: "Attach photos & documents" }).click();
@@ -315,6 +317,56 @@ test.describe("checklist attachments", () => {
 				await page.screenshot({ path: `${SHOTS}/checklist-attachments-${width}.png`, fullPage: true });
 		});
 	}
+
+	test("admins move a file to another check, or take it off this one", async ({ page }) => {
+		const { writes } = await installApi(page, "admin");
+		await page.goto("/projects/p1?stage=s3");
+
+		await page.getByRole("button", { name: "Actions for Termite protection certificate.pdf" }).click();
+		await page.getByRole("menuitem", { name: "Move to another check…" }).click();
+		const dialog = page.getByRole("dialog", { name: "Move to another check" });
+		const select = dialog.getByLabel("Check");
+		// Every check in the project except this one, grouped by stage.
+		await expect(select.locator("optgroup")).toHaveCount(8);
+		await expect(select.locator('option[value="s3i3"]')).toHaveCount(0);
+		await select.selectOption({ label: "Frame inspection" });
+		if (SHOTS) await dialog.screenshot({ path: `${SHOTS}/move-file-dialog.png` });
+		await dialog.getByRole("button", { name: "Move" }).click();
+		await expect(dialog).toBeHidden();
+		expect(writes).toContain("POST /items/s3i3/files/f2/move");
+
+		await page.getByRole("button", { name: "Actions for IMG_1001.jpg" }).click();
+		await page.getByRole("menuitem", { name: "Remove from this check" }).click();
+		await expect.poll(() => writes).toContain("DELETE /items/s3i2/files/ph1");
+		await noHorizontalScroll(page);
+	});
+
+	test("viewers get no file actions on the checklist", async ({ page }) => {
+		await installApi(page, "viewer");
+		await page.goto("/projects/p1?stage=s3");
+		await expect(page.getByRole("button", { name: "Open photo IMG_1001.jpg" })).toBeVisible();
+		await expect(page.getByRole("button", { name: /^Actions for .*\.(jpg|pdf)$/ })).toHaveCount(0);
+	});
+
+	test("review suggests the checklist item and attaches the file to it on confirm", async ({ page }) => {
+		const { writes } = await installApi(page, "admin");
+		await page.goto("/review/e1");
+		const check = page.getByLabel("Checklist item");
+		await expect(page.getByLabel("Stage", { exact: true })).toHaveValue("s4");
+		await expect(check).toHaveValue("s4i1");
+		await expect(page.getByText("Suggested: Frame inspection.")).toBeVisible();
+		// Another stage: its own checklist, no carried-over pick.
+		await page.getByLabel("Stage", { exact: true }).selectOption({ label: "Pre-construction" });
+		await expect(check).toHaveValue("");
+		await check.selectOption({ label: "Engineering plans" });
+		const posted = page.waitForRequest((r) => r.url().endsWith("/extractions/e1/confirm"));
+		await page
+			.getByRole("button", { name: /confirm/i })
+			.first()
+			.click();
+		expect((await posted).postDataJSON()).toMatchObject({ stageId: "s1", itemId: "s1i6" });
+		expect(writes).toContain("POST /extractions/e1/confirm");
+	});
 
 	test("checklist attachments open in the viewer and step through the check's files", async ({ page }) => {
 		await installApi(page, "viewer");

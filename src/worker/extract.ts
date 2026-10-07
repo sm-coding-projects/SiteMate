@@ -4,7 +4,7 @@
  */
 import { asc, eq } from "drizzle-orm";
 import { ulid } from "ulid";
-import { activity, documentExtractions, files, projectStages, suppliers } from "../db/schema";
+import { activity, documentExtractions, files, projectItems, projectStages, suppliers } from "../db/schema";
 import type { ExtractionFields, JobMessage } from "../shared/api-types";
 import type { QuoteFields } from "../shared/schemas";
 import { validateQuote } from "../shared/validators";
@@ -64,12 +64,23 @@ export async function runExtraction(env: Bindings, extractionId: string, attempt
 	if (!object) throw new PermanentError("The file is missing from storage");
 	const bytes = await object.arrayBuffer();
 
-	const stages = await db
-		.select({ name: projectStages.name })
-		.from(projectStages)
-		.where(eq(projectStages.projectId, file.projectId))
-		.orderBy(asc(projectStages.position));
-	const stageNames = stages.map((s) => s.name);
+	const [stages, items] = await Promise.all([
+		db
+			.select({ id: projectStages.id, name: projectStages.name })
+			.from(projectStages)
+			.where(eq(projectStages.projectId, file.projectId))
+			.orderBy(asc(projectStages.position)),
+		db
+			.select({ stageId: projectItems.projectStageId, title: projectItems.title })
+			.from(projectItems)
+			.innerJoin(projectStages, eq(projectItems.projectStageId, projectStages.id))
+			.where(eq(projectStages.projectId, file.projectId))
+			.orderBy(asc(projectItems.position)),
+	]);
+	const checklists = stages.map((s) => ({
+		name: s.name,
+		items: items.filter((i) => i.stageId === s.id).map((i) => i.title),
+	}));
 
 	// 1. Text (or native PDF for providers that read PDFs).
 	const input = await provider.prepare({ name: file.filename, mimeType: file.mimeType, bytes });
@@ -79,15 +90,17 @@ export async function runExtraction(env: Bindings, extractionId: string, attempt
 
 	// 2. Classify.
 	const cls = classificationResult.parse(
-		await provider.json(input, (t) => classifyPrompt(t, stageNames), "classification", classificationSchema),
+		await provider.json(input, (t) => classifyPrompt(t, checklists), "classification", classificationSchema),
 	);
 	// A file uploaded as a quote is extracted as one even if the model is unsure.
 	const documentType = file.category === "quote" && cls.documentType === "other" ? "quote" : cls.documentType;
-	const suggestedStage =
-		stageNames.find((s) => s.toLowerCase() === cls.suggestedStage?.toLowerCase()) ?? null;
+	const same = (a: string, b: string | null) => a.toLowerCase() === b?.trim().toLowerCase();
+	const stage = checklists.find((s) => same(s.name, cls.suggestedStage));
+	const suggestedStage = stage?.name ?? null;
+	const suggestedItem = stage?.items.find((i) => same(i, cls.suggestedItem)) ?? null;
 
 	// 3. Extract with a JSON schema, 4. validate in code.
-	const fields: ExtractionFields = { documentType, suggestedStage };
+	const fields: ExtractionFields = { documentType, suggestedStage, suggestedItem };
 	let validation = { checks: [] as { id: string; ok: boolean; message: string }[], warnings: [] as string[] };
 	if (documentType === "quote") {
 		const quote: QuoteFields = quoteResult.parse(

@@ -5,6 +5,8 @@ import { z } from "zod";
 import {
 	documentExtractions,
 	files,
+	itemFiles,
+	projectItems,
 	projectStages,
 	projects,
 	quotes,
@@ -104,14 +106,24 @@ export const extractionRoutes = new Hono<AppEnv>()
 		const db = c.get("db");
 		const { id } = c.req.valid("param");
 		const r = await loadExtraction(db, id);
-		const [stages, quote] = await Promise.all([
+		const [stageRows, itemRows, quote] = await Promise.all([
 			db
 				.select({ id: projectStages.id, name: projectStages.name, status: projectStages.status })
 				.from(projectStages)
 				.where(eq(projectStages.projectId, r.file.projectId))
 				.orderBy(asc(projectStages.position)),
+			db
+				.select({ id: projectItems.id, title: projectItems.title, stageId: projectItems.projectStageId })
+				.from(projectItems)
+				.innerJoin(projectStages, eq(projectItems.projectStageId, projectStages.id))
+				.where(eq(projectStages.projectId, r.file.projectId))
+				.orderBy(asc(projectItems.position)),
 			db.select({ id: quotes.id }).from(quotes).where(eq(quotes.extractionId, id)).get(),
 		]);
+		const stages = stageRows.map((s) => ({
+			...s,
+			items: itemRows.filter((i) => i.stageId === s.id).map(({ id, title }) => ({ id, title })),
+		}));
 		const detail: ExtractionDetail = {
 			...summary(r),
 			fields: (r.ex.fields as unknown as ExtractionFields) ?? null,
@@ -160,6 +172,22 @@ export const extractionRoutes = new Hono<AppEnv>()
 				});
 				if (!s) throw badRequest("Stage is not part of this project");
 			}
+			const check = body.itemId
+				? await db
+						.select({ title: projectItems.title, stage: projectStages.name })
+						.from(projectItems)
+						.innerJoin(projectStages, eq(projectItems.projectStageId, projectStages.id))
+						.where(and(eq(projectItems.id, body.itemId), eq(projectStages.projectId, projectId)))
+						.get()
+				: null;
+			if (body.itemId && !check) throw badRequest("Checklist item is not part of this project");
+			const alreadyAttached =
+				body.itemId &&
+				(await db
+					.select({ fileId: itemFiles.fileId })
+					.from(itemFiles)
+					.where(and(eq(itemFiles.itemId, body.itemId), eq(itemFiles.fileId, r.file.id)))
+					.get());
 
 			const now = Date.now();
 			const previous = (r.ex.fields as unknown as ExtractionFields | null) ?? null;
@@ -320,6 +348,25 @@ export const extractionRoutes = new Hono<AppEnv>()
 					now,
 				),
 			);
+			if (body.itemId && check && !alreadyAttached) {
+				statements.push(
+					db
+						.insert(itemFiles)
+						.values({ itemId: body.itemId, fileId: r.file.id, attachedBy: user.id, createdAt: now }),
+					logActivity(
+						db,
+						{
+							projectId,
+							actorId: user.id,
+							action: "item.files_attached",
+							entityType: "item",
+							entityId: body.itemId,
+							meta: { item: check.title, stage: check.stage, count: 1, file: r.file.filename },
+						},
+						now + 1,
+					),
+				);
+			}
 			await runBatch(db, statements);
 			return c.json({ id, status: "confirmed", quoteId });
 		},

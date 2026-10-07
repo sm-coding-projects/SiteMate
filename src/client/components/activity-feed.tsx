@@ -86,7 +86,13 @@ export function describeActivity(e: ActivityEntry): { kind: ActivityKind; tag: s
 					: `attached ${Number(m.count)} files to ${quoted(str(m.item))}`;
 			break;
 		case "item.files_detached":
-			what = `removed ${Number(m.count) === 1 ? "a file" : `${Number(m.count)} files`} from ${quoted(str(m.item))}`;
+			what =
+				Number(m.count) === 1 && m.file
+					? `removed ${str(m.file)} from ${quoted(str(m.item))}`
+					: `removed ${Number(m.count) === 1 ? "a file" : `${Number(m.count)} files`} from ${quoted(str(m.item))}`;
+			break;
+		case "item.file_moved":
+			what = `moved ${str(m.file)} from ${quoted(str(m.from))} to ${quoted(str(m.item))}`;
 			break;
 		case "item.removed":
 			what = `removed the check ${quoted(str(m.item))}`;

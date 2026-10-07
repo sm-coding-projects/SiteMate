@@ -16,7 +16,7 @@ Money is in Australian dollars as plain numbers (1234.5, not "$1,234.50").`;
 export const classificationSchema = {
 	type: "object",
 	additionalProperties: false,
-	required: ["documentType", "confidence", "suggestedStage"],
+	required: ["documentType", "confidence", "suggestedStage", "suggestedItem"],
 	properties: {
 		documentType: { type: "string", enum: [...DOCUMENT_TYPES] },
 		confidence: { type: "number", description: "0 to 1" },
@@ -25,6 +25,11 @@ export const classificationSchema = {
 			description:
 				"The build stage this document most likely belongs to, copied exactly from the list given, or null",
 		},
+		suggestedItem: {
+			type: ["string", "null"],
+			description:
+				"The checklist item in suggestedStage this document is evidence for, copied exactly from that stage's checklist, or null if none fits",
+		},
 	},
 } as const;
 
@@ -32,14 +37,18 @@ export const classificationResult = z.object({
 	documentType: z.enum(DOCUMENT_TYPES).catch("other"),
 	confidence: z.coerce.number().min(0).max(1).catch(0.5),
 	suggestedStage: z.string().nullable().catch(null),
+	suggestedItem: z.string().nullable().catch(null),
 });
 
-export const classifyPrompt = (text: string, stages: string[]) =>
+export const classifyPrompt = (text: string, stages: { name: string; items: string[] }[]) =>
 	`Classify this document.
 Types: quote (a price offered for future work, incl. estimates/tenders), invoice (a bill for work done or goods supplied),
 certificate (compliance, inspection, insurance, warranty, occupation), plan (drawings, specs, engineering),
 contract (building contract, variation, agreement), other.
-Build stages for this project: ${stages.map((s) => `"${s}"`).join(", ") || "none"}.
+Build stages for this project, each with its checklist:
+${stages.map((s) => `- "${s.name}": ${s.items.map((i) => `"${i}"`).join(", ") || "(no checklist)"}`).join("\n") || "none"}
+Pick the checklist item this document is evidence for (e.g. structural drawings → "Engineering plans",
+a soil report → "Soil test"). Don't pick an item just because it comes first.
 
 <document>
 ${text}

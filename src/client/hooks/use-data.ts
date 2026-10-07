@@ -182,6 +182,20 @@ export const useSetItemFiles = (projectId: string) =>
 		api(`/items/${id}/files`, { method: "PUT", ...json({ fileIds }) }),
 	);
 
+/** Takes one file off a checklist item (the file stays in the project). */
+export const useDetachItemFile = (projectId: string) =>
+	useProjectMutation(projectId, (api, { id, fileId }: { id: string; fileId: string }) =>
+		api(`/items/${id}/files/${fileId}`, { method: "DELETE" }),
+	);
+
+/** Moves one file from a checklist item to another item in the same project. */
+export const useMoveItemFile = (projectId: string) =>
+	useProjectMutation(
+		projectId,
+		(api, { id, fileId, itemId }: { id: string; fileId: string; itemId: string }) =>
+			api(`/items/${id}/files/${fileId}/move`, { method: "POST", ...json({ itemId }) }),
+	);
+
 export const useDeleteItem = (projectId: string) =>
 	useProjectMutation(projectId, (api, id: string) => api(`/items/${id}`, { method: "DELETE" }));
 

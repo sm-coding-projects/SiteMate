@@ -146,6 +146,10 @@ export type ItemUpdate = z.input<typeof itemUpdate>;
 /** The full set of files attached to an item (replaces the current set; [] detaches all). */
 export const itemFilesUpdate = z.object({ fileIds: z.array(idSchema).max(50, "Attach at most 50 files") });
 export type ItemFilesUpdate = z.infer<typeof itemFilesUpdate>;
+export const itemFileParam = z.object({ id: idSchema, fileId: idSchema });
+/** Moves one attached file from this check to another check in the same project. */
+export const itemFileMove = z.object({ itemId: idSchema });
+export type ItemFileMove = z.infer<typeof itemFileMove>;
 
 export const noteCreate = z.object({
 	body: z.string().trim().min(1, "Write something").max(5000),
@@ -308,11 +312,14 @@ export const extractionConfirm = z.discriminatedUnion("documentType", [
 		/** Use this existing supplier instead of matching/creating one. */
 		supplierId: idSchema.nullable().optional(),
 		stageId: idSchema.nullable().optional(),
+		/** Also attach the file to this checklist item (must be in `stageId`'s project). */
+		itemId: idSchema.nullable().optional(),
 	}),
 	z.object({
 		documentType: z.enum(["invoice", "certificate", "plan", "contract", "other"]),
 		fields: genericFields,
 		stageId: idSchema.nullable().optional(),
+		itemId: idSchema.nullable().optional(),
 	}),
 ]);
 export type ExtractionConfirm = z.input<typeof extractionConfirm>;
