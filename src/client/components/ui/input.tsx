@@ -73,7 +73,9 @@ function Field({
 	className?: string;
 }) {
 	return (
-		<div className={cn("grid gap-1.5", className)}>
+		// content-start: beside a taller field (one with a hint), keep the label and control at the top
+		// instead of spreading them over the stretched height.
+		<div className={cn("grid content-start gap-1.5", className)}>
 			<Label htmlFor={id}>{label}</Label>
 			{children}
 			{error ? (

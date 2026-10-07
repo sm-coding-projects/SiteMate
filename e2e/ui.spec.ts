@@ -217,6 +217,22 @@ test.describe("admin interactions", () => {
 		await expect(page.getByText(/GST is 10% of the ex.GST amount/)).toBeVisible();
 	});
 
+	test("side-by-side review fields line up when only one has a hint", async ({ page }) => {
+		await installApi(page, "admin");
+		await page.setViewportSize({ width: 1280, height: 900 });
+		await page.goto("/review/e1");
+		const type = page.getByLabel("Document type");
+		const stage = page.getByLabel("Stage", { exact: true });
+		await expect(page.getByText("Suggested: Frame")).toBeVisible();
+		const [a, b] = [await type.boundingBox(), await stage.boundingBox()];
+		expect(a?.y).toBe(b?.y);
+		if (SHOTS)
+			await page
+				.locator("fieldset")
+				.first()
+				.screenshot({ path: `${SHOTS}/review-fields.png` });
+	});
+
 	test("focus is visible on keyboard navigation", async ({ page }) => {
 		await installApi(page, "admin");
 		await page.goto("/projects");
