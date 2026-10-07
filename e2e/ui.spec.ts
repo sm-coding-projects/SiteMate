@@ -233,6 +233,42 @@ test.describe("admin interactions", () => {
 				.screenshot({ path: `${SHOTS}/review-fields.png` });
 	});
 
+	test("confirming moves on to the next document waiting for review", async ({ page }) => {
+		await installApi(page, "admin");
+		// A second document in the queue (registered after installApi, so it wins for this URL).
+		await page.route("**/api/extractions?status=needs_review*", (route) =>
+			route.fulfill({
+				contentType: "application/json",
+				body: JSON.stringify({
+					items: [{ id: "e1" }, { id: "e2" }],
+					nextCursor: null,
+				}),
+			}),
+		);
+		await page.goto("/review/e1");
+		await page.getByLabel("GST", { exact: true }).fill("3000");
+		await page.getByRole("button", { name: "Confirm quote" }).click();
+		await expect(page).toHaveURL(/\/review\/e2$/);
+		const notice = page.getByRole("status").filter({ hasText: "Confirmed Harbour Frames Q-1042.pdf." });
+		await expect(notice).toBeVisible();
+		await expect(notice.getByRole("link", { name: "View in 14 Banksia St quotes" })).toHaveAttribute(
+			"href",
+			"/projects/p1/quotes",
+		);
+	});
+
+	test("confirming the last document returns to the review inbox", async ({ page }) => {
+		await installApi(page, "admin");
+		await page.goto("/review/e1");
+		await page.getByLabel("GST", { exact: true }).fill("3000");
+		await page.getByRole("button", { name: "Confirm quote" }).click();
+		await expect(page).toHaveURL(/\/review$/);
+		await expect(
+			page.getByRole("status").filter({ hasText: "Confirmed Harbour Frames Q-1042.pdf." }),
+		).toBeVisible();
+		if (SHOTS) await page.screenshot({ path: `${SHOTS}/review-confirmed-notice.png` });
+	});
+
 	test("focus is visible on keyboard navigation", async ({ page }) => {
 		await installApi(page, "admin");
 		await page.goto("/projects");
