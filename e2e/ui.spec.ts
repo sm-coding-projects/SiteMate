@@ -438,6 +438,7 @@ test.describe("team access", () => {
 			role: "admin",
 			imageUrl: null,
 			lastSignInAt: null,
+			lastActiveAt: null,
 			accessRemoved: false,
 			createdAt: 0,
 		});

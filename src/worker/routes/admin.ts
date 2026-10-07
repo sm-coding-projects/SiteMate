@@ -112,13 +112,15 @@ export const adminRoutes = new Hono<AppEnv>()
 			clerk.users.getUserList({ limit: 100, orderBy: "-created_at" }),
 			clerk.invitations.getInvitationList({ status: "pending", limit: 100 }),
 		]).catch(clerkError);
-		const [projectRows, accessRows] = await db.batch([
+		const [projectRows, accessRows, activeRows] = await db.batch([
 			db
 				.select({ id: projects.id, name: projects.name, status: projects.status })
 				.from(projects)
 				.orderBy(asc(projects.name)),
 			db.select({ userId: projectAccess.userId, projectId: projectAccess.projectId }).from(projectAccess),
+			db.select({ id: users.id, lastActiveAt: users.lastActiveAt }).from(users),
 		]);
+		const activeAt = new Map(activeRows.map((u) => [u.id, u.lastActiveAt]));
 		const team: Team = {
 			projects: projectRows.map((p) => ({ id: p.id, name: p.name, archived: p.status === "archived" })),
 			members: list.data.map((u) => ({
@@ -128,6 +130,7 @@ export const adminRoutes = new Hono<AppEnv>()
 				role: toRole(u.publicMetadata?.role),
 				imageUrl: u.hasImage ? u.imageUrl : null,
 				lastSignInAt: u.lastSignInAt,
+				lastActiveAt: Math.max(u.lastSignInAt ?? 0, activeAt.get(u.id) ?? 0) || null,
 				accessRemoved: u.banned,
 				projectIds: accessRows.filter((a) => a.userId === u.id).map((a) => a.projectId),
 				createdAt: u.createdAt,

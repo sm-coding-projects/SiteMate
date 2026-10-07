@@ -17,6 +17,9 @@ export const clerk = () =>
 		})(c, next),
 	);
 
+/** `users.last_active_at` is rewritten at most this often per user, not on every request. */
+export const LAST_ACTIVE_RESOLUTION_MS = 5 * 60_000;
+
 const toRole = (value: unknown): Role => (ROLES.includes(value as Role) ? (value as Role) : "viewer");
 
 /**
@@ -87,6 +90,11 @@ export const requireUser = () =>
 					insert or ignore into ${projectAccess} (project_id, user_id)
 					select id, ${me.id} from ${projects} where id in ${invitedProjectIds}`);
 			}
+		}
+
+		const now = Date.now();
+		if (!existing?.lastActiveAt || now - existing.lastActiveAt > LAST_ACTIVE_RESOLUTION_MS) {
+			await db.update(users).set({ lastActiveAt: now }).where(eq(users.id, me.id));
 		}
 
 		c.set("user", { id: me.id, email: me.email, name: me.name, role: me.role });

@@ -120,6 +120,44 @@ describe("team management (admin)", () => {
 		expect(team.status).toBe(200);
 	});
 
+	it("tracks last activity from requests, not only Clerk sign-ins", async () => {
+		const lastActive = async () =>
+			(
+				await env.DB.prepare("select last_active_at t from users where id = ?")
+					.bind(VIEWER.id)
+					.first<{ t: number | null }>()
+			)?.t;
+		await api("/me", { as: VIEWER });
+		const first = await lastActive();
+		expect(first).toBeGreaterThan(Date.now() - 10_000);
+
+		// Within the resolution window a request doesn't rewrite it.
+		await api("/projects", { as: VIEWER });
+		expect(await lastActive()).toBe(first);
+
+		// A user still on yesterday's session: Clerk's lastSignInAt is a day old, our row is fresh.
+		const signedIn = Date.now() - 86_400_000;
+		fakeClerk.users.getUserList.mockResolvedValueOnce({
+			data: [
+				{
+					id: VIEWER.id,
+					firstName: "Vic",
+					lastName: "Viewer",
+					emailAddresses: [{ emailAddress: VIEWER.email }],
+					primaryEmailAddress: { emailAddress: VIEWER.email },
+					publicMetadata: { role: "viewer" },
+					hasImage: false,
+					lastSignInAt: signedIn,
+					banned: false,
+					createdAt: signedIn,
+				},
+			],
+			totalCount: 1,
+		} as never);
+		const team = await api<Team>("/admin/team", { as: ADMIN });
+		expect(team.body.members[0]).toMatchObject({ lastSignInAt: signedIn, lastActiveAt: first });
+	});
+
 	it("removes and restores access: banned in Clerk, blocked at the API, logged", async () => {
 		await api("/me", { as: VIEWER }); // creates the local row
 		const self = await api<{ error: string }>(`/admin/users/${ADMIN.id}/remove-access`, {

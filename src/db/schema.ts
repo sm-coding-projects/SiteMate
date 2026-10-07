@@ -52,6 +52,9 @@ export const users = sqliteTable("users", {
 	emailNotifications: integer("email_notifications", { mode: "boolean" }).notNull().default(true),
 	/** Set when an admin removes their access (the Clerk user is banned). Blocks the API and notifications. */
 	accessRevokedAt: integer("access_revoked_at"),
+	/** Last authenticated API request, at most LAST_ACTIVE_RESOLUTION_MS stale. Clerk's lastSignInAt misses
+	 * people who come back on a session that's still valid. */
+	lastActiveAt: integer("last_active_at"),
 	createdAt: createdAt(),
 	updatedAt: updatedAt(),
 });
