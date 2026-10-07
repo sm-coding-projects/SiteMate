@@ -10,7 +10,7 @@ import {
 	TriangleAlert,
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { PageHeader } from "@/components/page-header";
 import { LoadMore, QueryError } from "@/components/query-state";
 import { Button } from "@/components/ui/button";
@@ -29,7 +29,14 @@ import { useWide } from "@/hooks/use-media";
 import { errorMessage } from "@/lib/api";
 import { centsToInput, formatCents, formatWhen, parseDollars } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { DocumentType, ExtractionDetail, ExtractionStatus, Supplier } from "../../shared/api-types";
+import type {
+	DocumentType,
+	ExtractionDetail,
+	ExtractionStatus,
+	ExtractionSummary,
+	Page,
+	Supplier,
+} from "../../shared/api-types";
 import type { GenericFields, LineItem, QuoteFields } from "../../shared/schemas";
 import { formatAbn, validateQuote } from "../../shared/validators";
 
@@ -49,6 +56,29 @@ const TYPE_LABEL: Record<DocumentType, string> = {
 	other: "Other",
 };
 
+/** Carried in navigation state after a confirm, so the reviewer stays in the queue but can still jump to the result. */
+interface ConfirmedState {
+	confirmed: { filename: string; href: string; where: string };
+}
+
+function ConfirmedNotice() {
+	const state = useLocation().state as ConfirmedState | null;
+	if (!state?.confirmed) return null;
+	const { filename, href, where } = state.confirmed;
+	return (
+		<p
+			role="status"
+			className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border bg-status-complete-bg px-4 py-3 text-sm"
+		>
+			<CircleCheck className="size-4 shrink-0 text-status-complete" aria-hidden />
+			<span className="min-w-0 break-words">Confirmed {filename}.</span>
+			<Link to={href} className="font-medium text-link underline-offset-4 hover:underline">
+				View in {where}
+			</Link>
+		</p>
+	);
+}
+
 // ── Inbox ────────────────────────────────────────────────────────────────────
 
 export function ReviewInboxPage() {
@@ -61,6 +91,7 @@ export function ReviewInboxPage() {
 				title="Review"
 				description="Documents BFH App has read. Check the details, then confirm — nothing counts towards totals until you do."
 			/>
+			<ConfirmedNotice />
 			<Field id="review-filter" label="Show" className="mb-6 sm:w-64">
 				<NativeSelect id="review-filter" value={status} onChange={(e) => setStatus(e.target.value)}>
 					<option value="open">Waiting on someone</option>
@@ -147,8 +178,11 @@ export function ReviewPage() {
 
 	if (ex.isPending) {
 		return (
-			<div role="status" aria-busy="true">
-				<span className="sr-only">Loading</span>
+			<div aria-busy="true">
+				<ConfirmedNotice />
+				<span className="sr-only" role="status">
+					Loading
+				</span>
 				<Skeleton className="h-9 w-72 max-w-full" />
 				<div className="mt-8 grid gap-6 lg:grid-cols-2">
 					<Skeleton className="h-[60dvh]" />
@@ -157,7 +191,13 @@ export function ReviewPage() {
 			</div>
 		);
 	}
-	if (ex.isError || !ex.data) return <QueryError error={ex.error} onRetry={() => ex.refetch()} />;
+	if (ex.isError || !ex.data)
+		return (
+			<>
+				<ConfirmedNotice />
+				<QueryError error={ex.error} onRetry={() => ex.refetch()} />
+			</>
+		);
 	const e = ex.data;
 
 	return (
@@ -168,6 +208,7 @@ export function ReviewPage() {
 			>
 				<ArrowLeft className="size-[18px]" aria-hidden /> {e.project.name}
 			</Link>
+			<ConfirmedNotice />
 			<div className="mt-2 mb-6 flex flex-wrap items-start justify-between gap-3">
 				<div className="min-w-0">
 					<h1 className="text-2xl font-semibold break-words">{e.file.filename}</h1>
@@ -333,7 +374,22 @@ function useSuppliers() {
 
 function ReviewForm({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
 	const navigate = useNavigate();
+	const api = useApi();
 	const confirm = useConfirmExtraction(e.id, e.project.id);
+	/** Next document waiting for review (any project), else back to the inbox; says what was just confirmed. */
+	const goNext = async (kind: "quotes" | "documents") => {
+		const state: ConfirmedState = {
+			confirmed: {
+				filename: e.file.filename,
+				href: `/projects/${e.project.id}/${kind}`,
+				where: `${e.project.name} ${kind === "quotes" ? "quotes" : "documents"}`,
+			},
+		};
+		const next = await api<Page<ExtractionSummary>>("/extractions?status=needs_review&limit=2")
+			.then((p) => p.items.find((x) => x.id !== e.id))
+			.catch(() => undefined);
+		navigate(next ? `/review/${next.id}` : "/review", { state });
+	};
 	const rerun = useRerunExtraction();
 	const suppliers = useSuppliers();
 	const [type, setType] = useState<DocumentType>(e.fields?.documentType ?? e.detectedType ?? "other");
@@ -414,7 +470,7 @@ function ReviewForm({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
 					itemId: itemId || null,
 				},
 				{
-					onSuccess: () => navigate(`/projects/${e.project.id}/quotes`),
+					onSuccess: () => goNext("quotes"),
 					onError: (err) => setError(errorMessage(err)),
 				},
 			);
@@ -422,7 +478,7 @@ function ReviewForm({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
 			confirm.mutate(
 				{ documentType: type, fields: generic, stageId: stageId || null, itemId: itemId || null },
 				{
-					onSuccess: () => navigate(`/projects/${e.project.id}/documents`),
+					onSuccess: () => goNext("documents"),
 					onError: (err) => setError(errorMessage(err)),
 				},
 			);
