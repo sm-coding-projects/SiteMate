@@ -229,8 +229,8 @@ function MemberRow({
 					{member.email}
 					{removed
 						? ""
-						: member.lastSignInAt
-							? ` · last in ${formatWhen(member.lastSignInAt)}`
+						: member.lastActiveAt
+							? ` · last active ${formatWhen(member.lastActiveAt)}`
 							: " · not signed in yet"}
 				</span>
 				{member.role === "viewer" && !removed && (

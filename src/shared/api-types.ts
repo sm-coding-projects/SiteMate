@@ -284,6 +284,8 @@ export interface TeamMember {
 	role: Role;
 	imageUrl: string | null;
 	lastSignInAt: number | null;
+	/** Last time they used BFH App (their latest request, or sign-in if that's later). */
+	lastActiveAt: number | null;
 	/** Access removed by an admin (banned in Clerk): can't sign in until restored. */
 	accessRemoved: boolean;
 	/** Viewers: the projects they can see (empty until assigned). Always empty for admins. */

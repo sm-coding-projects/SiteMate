@@ -57,6 +57,13 @@
       "when": 1791152488210,
       "tag": "0007_project_address",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791414602591,
+      "tag": "0008_users_last_active",
+      "breakpoints": true
     }
   ]
 }
