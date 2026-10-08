@@ -260,6 +260,31 @@ test.describe("admin interactions", () => {
 		);
 	});
 
+	test("review: download the document, or delete it and move on", async ({ page }) => {
+		const { writes } = await installApi(page, "admin");
+		// The signed download URL: same page + hash here, so following it doesn't navigate away.
+		await page.route("**/api/files/f1/url?download=1", (route) =>
+			route.fulfill({
+				contentType: "application/json",
+				body: JSON.stringify({ url: "/review/e1#downloaded", expiresAt: Date.now() + 60_000 }),
+			}),
+		);
+		await page.goto("/review/e1");
+		await page.getByRole("button", { name: "Download" }).click();
+		await expect(page).toHaveURL(/#downloaded$/);
+
+		await page.getByRole("button", { name: "Delete" }).click();
+		const dialog = page.getByRole("dialog", { name: "Delete Harbour Frames Q-1042.pdf?" });
+		await expect(dialog.getByText("removed from 14 Banksia St and from the review queue")).toBeVisible();
+		if (SHOTS) await dialog.screenshot({ path: `${SHOTS}/review-delete-dialog.png` });
+		await dialog.getByRole("button", { name: "Delete" }).click();
+		await expect(page).toHaveURL(/\/review$/);
+		await expect(
+			page.getByRole("status").filter({ hasText: "Deleted Harbour Frames Q-1042.pdf." }),
+		).toBeVisible();
+		expect(writes).toContain("DELETE /files/f1");
+	});
+
 	test("confirming the last document returns to the review inbox", async ({ page }) => {
 		await installApi(page, "admin");
 		await page.goto("/review/e1");

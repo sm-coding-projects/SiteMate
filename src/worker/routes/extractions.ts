@@ -56,7 +56,8 @@ async function loadExtraction(db: Db, id: string) {
 		.leftJoin(users, eq(documentExtractions.reviewedBy, users.id))
 		.where(eq(documentExtractions.id, id))
 		.get();
-	if (!row) throw notFound("Extraction not found");
+	// A deleted document leaves the review queue for good (the row is kept for history).
+	if (!row || row.file.deletedAt) throw notFound("Extraction not found");
 	return row;
 }
 
