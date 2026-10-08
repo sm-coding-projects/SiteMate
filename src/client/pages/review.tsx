@@ -1,7 +1,8 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
 	ArrowLeft,
 	CircleCheck,
+	Download,
 	ExternalLink,
 	Plus,
 	RotateCcw,
@@ -11,6 +12,8 @@ import {
 } from "lucide-react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
+import { ConfirmDialog } from "@/components/confirm-dialog";
+import { useOpenFile } from "@/components/file-viewer";
 import { PageHeader } from "@/components/page-header";
 import { LoadMore, QueryError } from "@/components/query-state";
 import { Button } from "@/components/ui/button";
@@ -19,6 +22,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useApi } from "@/hooks/use-api";
 import {
 	useConfirmExtraction,
+	useDeleteFile,
 	useExtraction,
 	useExtractions,
 	useFileUrl,
@@ -56,27 +60,44 @@ const TYPE_LABEL: Record<DocumentType, string> = {
 	other: "Other",
 };
 
-/** Carried in navigation state after a confirm, so the reviewer stays in the queue but can still jump to the result. */
-interface ConfirmedState {
-	confirmed: { filename: string; href: string; where: string };
+/**
+ * Carried in navigation state after a confirm or delete, so the reviewer stays in the queue but still sees what
+ * happened (and can jump to the result).
+ */
+interface NoticeState {
+	notice: { text: string; link?: { href: string; label: string } };
 }
 
 function ConfirmedNotice() {
-	const state = useLocation().state as ConfirmedState | null;
-	if (!state?.confirmed) return null;
-	const { filename, href, where } = state.confirmed;
+	const state = useLocation().state as NoticeState | null;
+	if (!state?.notice) return null;
+	const { text, link } = state.notice;
 	return (
 		<p
 			role="status"
 			className="mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border bg-status-complete-bg px-4 py-3 text-sm"
 		>
 			<CircleCheck className="size-4 shrink-0 text-status-complete" aria-hidden />
-			<span className="min-w-0 break-words">Confirmed {filename}.</span>
-			<Link to={href} className="font-medium text-link underline-offset-4 hover:underline">
-				View in {where}
-			</Link>
+			<span className="min-w-0 break-words">{text}</span>
+			{link && (
+				<Link to={link.href} className="font-medium text-link underline-offset-4 hover:underline">
+					{link.label}
+				</Link>
+			)}
 		</p>
 	);
+}
+
+/** Opens the next document waiting for review (any project), else the inbox, carrying a notice. */
+function useGoToNextReview(currentId: string) {
+	const navigate = useNavigate();
+	const api = useApi();
+	return async (notice: NoticeState["notice"]) => {
+		const next = await api<Page<ExtractionSummary>>("/extractions?status=needs_review&limit=2")
+			.then((p) => p.items.find((x) => x.id !== currentId))
+			.catch(() => undefined);
+		navigate(next ? `/review/${next.id}` : "/review", { state: { notice } satisfies NoticeState });
+	};
 }
 
 // ── Inbox ────────────────────────────────────────────────────────────────────
@@ -217,7 +238,10 @@ export function ReviewPage() {
 						{e.confidence != null && ` · ${e.confidence}% sure it's a ${e.detectedType ?? "document"}`}
 					</p>
 				</div>
-				<ExtractionBadge status={e.status} />
+				<div className="flex flex-wrap items-center gap-2">
+					<ExtractionBadge status={e.status} />
+					<FileActions e={e} isAdmin={isAdmin} />
+				</div>
 			</div>
 
 			<div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-8">
@@ -232,6 +256,61 @@ export function ReviewPage() {
 					)}
 				</div>
 			</div>
+		</>
+	);
+}
+
+/** Download for everyone who can see the review; Delete (soft, like the Documents tab) for admins. */
+function FileActions({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
+	const { open, error } = useOpenFile();
+	const remove = useDeleteFile(e.project.id);
+	const goToNext = useGoToNextReview(e.id);
+	const qc = useQueryClient();
+	const [deleting, setDeleting] = useState(false);
+	return (
+		<>
+			<Button variant="outline" size="sm" onClick={() => open(e.file.id, { download: true })}>
+				<Download aria-hidden /> Download
+			</Button>
+			{isAdmin && (
+				<Button variant="outline" size="sm" className="text-destructive" onClick={() => setDeleting(true)}>
+					<Trash2 aria-hidden /> Delete
+				</Button>
+			)}
+			{error && (
+				<p role="alert" className="w-full text-sm text-destructive">
+					{error}
+				</p>
+			)}
+			<ConfirmDialog
+				open={deleting}
+				onOpenChange={(o) => {
+					setDeleting(o);
+					if (!o) remove.reset();
+				}}
+				title={`Delete ${e.file.filename}?`}
+				description={
+					<>
+						It's removed from {e.project.name} and from the review queue.
+						{e.status === "confirmed" ? " Confirmed quote totals from it are kept." : ""}
+						{remove.isError && (
+							<span className="mt-2 block text-destructive">{errorMessage(remove.error)}</span>
+						)}
+					</>
+				}
+				confirmLabel="Delete"
+				destructive
+				pending={remove.isPending}
+				onConfirm={() =>
+					remove.mutate(e.file.id, {
+						onSuccess: () => {
+							setDeleting(false);
+							qc.invalidateQueries({ queryKey: ["extractions"] });
+							goToNext({ text: `Deleted ${e.file.filename}.` });
+						},
+					})
+				}
+			/>
 		</>
 	);
 }
@@ -373,23 +452,13 @@ function useSuppliers() {
 }
 
 function ReviewForm({ e, isAdmin }: { e: ExtractionDetail; isAdmin: boolean }) {
-	const navigate = useNavigate();
-	const api = useApi();
 	const confirm = useConfirmExtraction(e.id, e.project.id);
-	/** Next document waiting for review (any project), else back to the inbox; says what was just confirmed. */
-	const goNext = async (kind: "quotes" | "documents") => {
-		const state: ConfirmedState = {
-			confirmed: {
-				filename: e.file.filename,
-				href: `/projects/${e.project.id}/${kind}`,
-				where: `${e.project.name} ${kind === "quotes" ? "quotes" : "documents"}`,
-			},
-		};
-		const next = await api<Page<ExtractionSummary>>("/extractions?status=needs_review&limit=2")
-			.then((p) => p.items.find((x) => x.id !== e.id))
-			.catch(() => undefined);
-		navigate(next ? `/review/${next.id}` : "/review", { state });
-	};
+	const goToNext = useGoToNextReview(e.id);
+	const goNext = (kind: "quotes" | "documents") =>
+		goToNext({
+			text: `Confirmed ${e.file.filename}.`,
+			link: { href: `/projects/${e.project.id}/${kind}`, label: `View in ${e.project.name} ${kind}` },
+		});
 	const rerun = useRerunExtraction();
 	const suppliers = useSuppliers();
 	const [type, setType] = useState<DocumentType>(e.fields?.documentType ?? e.detectedType ?? "other");

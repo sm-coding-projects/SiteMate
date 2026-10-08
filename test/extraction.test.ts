@@ -283,4 +283,32 @@ describe("AI extraction pipeline", () => {
 		ex = await api<ExtractionDetail>(`/extractions/${extractionId}`, { as: ADMIN });
 		expect(ex.body.status).toBe("queued");
 	});
+
+	it("a deleted document leaves the review queue and can't be confirmed", async () => {
+		const projectId = await createProject();
+		const extractionId = await uploadQuote(projectId);
+		await consume({ type: "extract", extractionId }, { ...env, AI: fakeAi() } as unknown as Bindings);
+		const ex = await api<ExtractionDetail>(`/extractions/${extractionId}`, { as: ADMIN });
+		expect(ex.body.status).toBe("needs_review");
+
+		expect((await api(`/files/${ex.body.file.id}`, { as: VIEWER, method: "DELETE" })).status).toBe(403);
+		expect((await api(`/files/${ex.body.file.id}`, { as: ADMIN, method: "DELETE" })).status).toBe(200);
+
+		const list = await api<{ items: { id: string }[] }>("/extractions?status=open", { as: ADMIN });
+		expect(list.body.items.map((i) => i.id)).not.toContain(extractionId);
+		expect((await api(`/extractions/${extractionId}`, { as: ADMIN })).status).toBe(404);
+		const q = ex.body.fields?.quote;
+		if (!q) throw new Error("no quote");
+		const confirm = await api(`/extractions/${extractionId}/confirm`, {
+			as: ADMIN,
+			method: "POST",
+			body: {
+				documentType: "quote",
+				fields: { ...q, supplierName: q.supplierName ?? "x", gstCents: 300_000 },
+			},
+		});
+		expect(confirm.status).toBe(404);
+		const quotes = await api<ProjectQuotes>(`/projects/${projectId}/quotes`, { as: ADMIN });
+		expect(quotes.body.quotes).toHaveLength(0);
+	});
 });
