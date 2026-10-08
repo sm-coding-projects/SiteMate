@@ -14,6 +14,7 @@ const PAGES = [
 	"/review",
 	"/review/e1",
 	"/activity",
+	"/ask?project=p1",
 	"/account",
 	"/team",
 ];
@@ -57,7 +58,7 @@ test.describe("viewer is read-only in the UI", () => {
 		if (SHOTS) await page.screenshot({ path: `${SHOTS}/viewer-projects-375.png`, fullPage: true });
 		// No sidebar or tab bar (a project's own Activity tab stays; see below).
 		await expect(page.getByRole("navigation", { name: "Main" })).toHaveCount(0);
-		await expect(page.getByRole("link", { name: /^(review|activity|team)$/i })).toHaveCount(0);
+		await expect(page.getByRole("link", { name: /^(review|activity|team|ask ai)$/i })).toHaveCount(0);
 
 		await page.goto("/projects/p1");
 		await expect(page.getByRole("heading", { name: "Frame" })).toBeVisible();
@@ -79,7 +80,7 @@ test.describe("viewer is read-only in the UI", () => {
 		await expect(page.getByRole("button", { name: /accept|reject/i })).toHaveCount(0);
 
 		// The workspace-wide pages send them back to their projects.
-		for (const path of ["/review", "/review/e1", "/activity", "/team"]) {
+		for (const path of ["/review", "/review/e1", "/activity", "/team", "/ask"]) {
 			await page.goto(path);
 			await expect(page, path).toHaveURL(/\/projects$/);
 		}
@@ -224,6 +225,8 @@ test.describe("admin interactions", () => {
 		const type = page.getByLabel("Document type");
 		const stage = page.getByLabel("Stage", { exact: true });
 		await expect(page.getByText("Suggested: Frame", { exact: true })).toBeVisible();
+		// Measure after the page's slide-in, or the two boxes are read at different points of it.
+		await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
 		const [a, b] = [await type.boundingBox(), await stage.boundingBox()];
 		expect(a?.y).toBe(b?.y);
 		if (SHOTS)
@@ -559,5 +562,52 @@ test.describe("team access", () => {
 		await page.getByRole("button", { name: "Actions for Jo Admin" }).click();
 		await expect(page.getByRole("menuitem", { name: "Remove access" })).toBeVisible();
 		await expect(page.getByRole("menuitem", { name: "Delete permanently" })).toHaveCount(0);
+	});
+});
+
+test.describe("Ask AI", () => {
+	test("admins pick a project, see proposals, and approve one", async ({ page }) => {
+		const { writes } = await installApi(page, "admin");
+		await page.setViewportSize({ width: 1280, height: 900 });
+		await page.goto("/projects");
+		await page.getByRole("link", { name: "Ask AI" }).first().click();
+		await expect(page).toHaveURL(/\/ask/);
+		await expect(page.getByText("Choose a project to start.")).toBeVisible();
+
+		await page.getByLabel("Project").selectOption({ label: "14 Banksia St" });
+		await expect(page).toHaveURL(/\/ask\?project=p1$/);
+		const proposals = page.getByRole("list", { name: "Suggested changes" });
+		await expect(proposals.getByText("Done by Sam Site")).toBeVisible();
+		await expect(proposals.getByRole("button", { name: "Approve" })).toHaveCount(1);
+		if (SHOTS) await page.screenshot({ path: `${SHOTS}/ask-ai-1280.png`, fullPage: true });
+
+		const decided = page.waitForRequest((r) => r.url().endsWith("/api/chat/m2/actions/a1"));
+		await proposals.getByRole("button", { name: "Approve" }).click();
+		expect((await decided).postDataJSON()).toEqual({ decision: "approve" });
+		expect(writes).toContain("POST /chat/m2/actions/a1");
+		// No way to delete files from here: the only destructive control clears the chat itself.
+		await expect(page.getByRole("button", { name: /delete|remove/i })).toHaveCount(0);
+	});
+
+	test("asking sends the question for the chosen project", async ({ page }) => {
+		await installApi(page, "admin");
+		await page.setViewportSize({ width: 375, height: 812 });
+		await page.goto("/ask?project=p1");
+		await expect(page.getByRole("button", { name: "Approve" })).toBeVisible();
+		// Five tabs fit on one row of the phone tab bar.
+		const tabs = page.getByRole("navigation", { name: "Main" }).getByRole("link");
+		await expect(tabs).toHaveCount(5);
+		const tops = await tabs.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().top)));
+		expect(new Set(tops).size).toBe(1);
+		await page.waitForTimeout(400); // let the page fade-in finish before the screenshot
+		if (SHOTS) await page.screenshot({ path: `${SHOTS}/ask-ai-375.png` });
+		const input = page.getByLabel("Your question");
+		await input.fill("What's still open in Frame?");
+		const sent = page.waitForRequest(
+			(r) => r.url().endsWith("/api/projects/p1/chat") && r.method() === "POST",
+		);
+		await input.press("Enter");
+		expect((await sent).postDataJSON()).toEqual({ message: "What's still open in Frame?" });
+		await noHorizontalScroll(page);
 	});
 });

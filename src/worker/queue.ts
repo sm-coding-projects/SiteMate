@@ -1,4 +1,5 @@
 import type { JobMessage } from "../shared/api-types";
+import { markChatFailed, runChat } from "./ai/chat";
 import { sendNotification } from "./email";
 import {
 	MAX_EXTRACTION_ATTEMPTS,
@@ -30,6 +31,9 @@ export async function handleQueue(batch: MessageBatch<JobMessage>, env: Bindings
 				case "notify":
 					await sendNotification(env, body);
 					break;
+				case "chat":
+					await runChat(env, body.messageId);
+					break;
 				default:
 					console.warn("unknown job type", body);
 			}
@@ -45,6 +49,10 @@ export async function handleQueue(batch: MessageBatch<JobMessage>, env: Bindings
 					await markExtractionRetrying(env, body.extractionId, message).catch((e) => console.error(e));
 					msg.retry({ delaySeconds: 30 * msg.attempts });
 				}
+			} else if (body.type === "chat") {
+				// One try: the admin is waiting and can simply ask again.
+				await markChatFailed(env, body.messageId, message).catch((e) => console.error(e));
+				msg.ack();
 			} else if (msg.attempts >= 3) {
 				msg.ack(); // give up on email after three tries; email_log has the error
 			} else {

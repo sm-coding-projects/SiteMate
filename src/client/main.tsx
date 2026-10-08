@@ -12,6 +12,7 @@ import { ApiRequestError } from "@/lib/api";
 import { siteUrl } from "@/lib/hosts";
 import { AccountPage } from "@/pages/account";
 import { ActivityPage } from "@/pages/activity";
+import { AskPage } from "@/pages/ask";
 import { LandingPage } from "@/pages/landing";
 import { ProjectActivityTab } from "@/pages/project/activity";
 import { DocumentsTab } from "@/pages/project/documents";
@@ -70,6 +71,7 @@ const router = createBrowserRouter([
 						children: [
 							{ path: "review", element: <ReviewInboxPage />, errorElement: <RouteError /> },
 							{ path: "review/:id", element: <ReviewPage />, errorElement: <RouteError /> },
+							{ path: "ask", element: <AskPage />, errorElement: <RouteError /> },
 							{ path: "activity", element: <ActivityPage /> },
 							{ path: "team", element: <TeamPage />, errorElement: <RouteError /> },
 						],

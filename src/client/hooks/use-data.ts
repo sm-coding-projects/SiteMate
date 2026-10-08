@@ -13,6 +13,8 @@ import type {
 	AiProtocol,
 	AiSettings,
 	AiTestResult,
+	ChatAction,
+	ChatMessage,
 	ExtractionDetail,
 	ExtractionSummary,
 	FileEntry,
@@ -475,5 +477,68 @@ export function useSaveAiSettings() {
 			qc.setQueryData(["ai-settings"], data);
 			qc.invalidateQueries({ queryKey: ["activity"] });
 		},
+	});
+}
+
+// ── Ask AI ───────────────────────────────────────────────────────────────────
+
+const chatKey = (projectId: string) => ["chat", projectId] as const;
+
+/** One project's conversation; polls while the assistant is answering. */
+export function useChat(projectId: string | undefined) {
+	const api = useApi();
+	return useQuery({
+		queryKey: chatKey(projectId ?? ""),
+		queryFn: () => api<{ messages: ChatMessage[] }>(`/projects/${projectId}/chat`),
+		enabled: Boolean(projectId),
+		refetchInterval: (q) => (q.state.data?.messages?.some((m) => m.status === "pending") ? 2000 : false),
+	});
+}
+
+export function useSendChat(projectId: string) {
+	const api = useApi();
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: (message: string) =>
+			api<{ messages: ChatMessage[] }>(`/projects/${projectId}/chat`, {
+				method: "POST",
+				...json({ message }),
+			}),
+		onSuccess: (data) =>
+			Array.isArray(data?.messages)
+				? qc.setQueryData(chatKey(projectId), data)
+				: qc.invalidateQueries({ queryKey: chatKey(projectId) }),
+	});
+}
+
+/** Approve (runs the change as you) or dismiss one proposal. */
+export function useDecideChatAction(projectId: string) {
+	const api = useApi();
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: ({
+			messageId,
+			actionId,
+			decision,
+		}: {
+			messageId: string;
+			actionId: string;
+			decision: "approve" | "dismiss";
+		}) =>
+			api<ChatAction>(`/chat/${messageId}/actions/${actionId}`, { method: "POST", ...json({ decision }) }),
+		onSettled: () => {
+			qc.invalidateQueries({ queryKey: chatKey(projectId) });
+			invalidateProject(qc, projectId);
+			qc.invalidateQueries({ queryKey: ["extractions"] });
+		},
+	});
+}
+
+export function useClearChat(projectId: string) {
+	const api = useApi();
+	const qc = useQueryClient();
+	return useMutation({
+		mutationFn: () => api(`/projects/${projectId}/chat`, { method: "DELETE" }),
+		onSuccess: () => qc.setQueryData(chatKey(projectId), { messages: [] }),
 	});
 }

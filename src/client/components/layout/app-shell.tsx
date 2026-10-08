@@ -99,7 +99,7 @@ export function AppShell() {
 			{/* Mobile bottom tab bar */}
 			<nav
 				aria-label="Main"
-				className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-4 border-t bg-sidebar pb-[env(safe-area-inset-bottom)] md:hidden"
+				className="fixed inset-x-0 bottom-0 z-30 grid auto-cols-fr grid-flow-col border-t bg-sidebar pb-[env(safe-area-inset-bottom)] md:hidden"
 			>
 				{mobileNav.map(({ to, label, icon: Icon }) => (
 					<NavLink

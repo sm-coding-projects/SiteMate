@@ -187,3 +187,104 @@ export async function complete(
 
 const emptyMessage = (ranOut: boolean) =>
 	ranOut ? "The model used its whole token budget before answering" : "The model returned an empty answer";
+
+// ── Tool calling (Ask AI) ────────────────────────────────────────────────────
+
+export interface ToolDef {
+	name: string;
+	description: string;
+	/** JSON Schema for the arguments. */
+	parameters: object;
+}
+export interface ToolCall {
+	name: string;
+	args: Record<string, unknown>;
+}
+export interface ChatTurn {
+	role: "user" | "assistant";
+	content: string;
+}
+
+const parseArgs = (v: unknown): Record<string, unknown> => {
+	if (v && typeof v === "object") return v as Record<string, unknown>;
+	if (typeof v !== "string") return {};
+	try {
+		const o = JSON.parse(v);
+		return o && typeof o === "object" ? o : {};
+	} catch {
+		return {};
+	}
+};
+
+/**
+ * One turn of a conversation with tools available. Returns the answer text and any tool calls; the caller
+ * decides what a call means (Ask AI only records them as proposals, it never executes them here).
+ */
+export async function completeWithTools(
+	e: Endpoint,
+	model: string,
+	opts: { system: string; turns: ChatTurn[]; tools: ToolDef[]; maxTokens: number },
+): Promise<{ text: string; calls: ToolCall[] }> {
+	if (e.protocol === "anthropic") {
+		const body = await request<{
+			content?: { type: string; text?: string; name?: string; input?: unknown }[];
+			stop_reason?: string;
+		}>(e, "/messages", {
+			method: "POST",
+			body: {
+				model,
+				max_tokens: opts.maxTokens,
+				system: opts.system,
+				messages: opts.turns,
+				tools: opts.tools.map((t) => ({
+					name: t.name,
+					description: t.description,
+					input_schema: t.parameters,
+				})),
+			},
+		});
+		const blocks = body.content ?? [];
+		const text = stripThinking(
+			blocks
+				.filter((b) => b.type === "text")
+				.map((b) => b.text ?? "")
+				.join(""),
+		);
+		const calls = blocks
+			.filter((b) => b.type === "tool_use" && typeof b.name === "string")
+			.map((b) => ({ name: b.name as string, args: parseArgs(b.input) }));
+		if (!text && calls.length === 0)
+			throw new EndpointError(502, emptyMessage(body.stop_reason === "max_tokens"));
+		return { text, calls };
+	}
+
+	const body = await request<{
+		choices?: {
+			message?: {
+				content?: string | null;
+				tool_calls?: { function?: { name?: string; arguments?: unknown } }[];
+			};
+			finish_reason?: string;
+		}[];
+	}>(e, "/chat/completions", {
+		method: "POST",
+		body: {
+			model,
+			max_tokens: opts.maxTokens,
+			messages: [{ role: "system", content: opts.system }, ...opts.turns],
+			tools: opts.tools.map((t) => ({
+				type: "function",
+				function: { name: t.name, description: t.description, parameters: t.parameters },
+			})),
+			tool_choice: "auto",
+		},
+	});
+	const choice = body.choices?.[0];
+	const text = stripThinking(choice?.message?.content ?? "");
+	const calls = (choice?.message?.tool_calls ?? [])
+		.filter((c) => typeof c.function?.name === "string")
+		.map((c) => ({ name: c.function?.name as string, args: parseArgs(c.function?.arguments) }));
+	if (!text && calls.length === 0)
+		throw new EndpointError(502, emptyMessage(choice?.finish_reason === "length"));
+	return { text, calls };
+}

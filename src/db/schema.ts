@@ -22,6 +22,8 @@ import {
 import {
 	AI_PROTOCOLS,
 	AU_STATES,
+	CHAT_ROLES,
+	CHAT_STATUSES,
 	EXTRACTION_STATUSES,
 	FILE_CATEGORIES,
 	PROJECT_STATUSES,
@@ -401,6 +403,30 @@ export type User = typeof users.$inferSelect;
 export type NewActivity = typeof activity.$inferInsert;
 export type Project = typeof projects.$inferSelect;
 export type ProjectStage = typeof projectStages.$inferSelect;
+/**
+ * Ask AI: one conversation per project, shared by admins. Assistant rows start `pending` while the queue consumer
+ * asks the model, and carry the changes it proposes (`actions`); each waits for a person to approve or dismiss.
+ */
+export const aiChatMessages = sqliteTable(
+	"ai_chat_messages",
+	{
+		id: text("id").primaryKey(),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => projects.id, { onDelete: "cascade" }),
+		role: text("role", { enum: CHAT_ROLES }).notNull(),
+		/** Who asked (user rows); null for the assistant. */
+		authorId: text("author_id").references(() => users.id),
+		content: text("content").notNull().default(""),
+		status: text("status", { enum: CHAT_STATUSES }).notNull().default("done"),
+		actions: text("actions", { mode: "json" }).$type<import("../shared/api-types").ChatAction[]>(),
+		error: text("error"),
+		createdAt: createdAt(),
+		updatedAt: updatedAt(),
+	},
+	(t) => [index("ai_chat_messages_project_idx").on(t.projectId, t.createdAt)],
+);
+
 export type ProjectItem = typeof projectItems.$inferSelect;
 export type FileRow = typeof files.$inferSelect;
 export type Extraction = typeof documentExtractions.$inferSelect;

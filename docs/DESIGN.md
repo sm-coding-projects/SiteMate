@@ -133,6 +133,28 @@ All provider calls route through **Cloudflare AI Gateway** (free) for logging, c
 otherwise extraction falls back to Workers AI. The Anthropic provider uses `claude-opus-5-5` with native PDF input
 (≤ 5 MB), structured JSON output and the server-side refusal fallback.
 
+## 5b. Ask AI
+
+Admins only (sidebar → Ask AI). One conversation per project, stored in `ai_chat_messages` and shared by admins;
+"Clear chat" removes the conversation only. The admin picks the project first, and the model only ever sees a
+snapshot of that one project: stages and checklists with attached files, documents (newest 150), photos
+(newest 60), and the project's review queue with what was read from each document.
+
+The answer is produced in the Queue consumer (`ai/chat.ts`), like extraction: the request stores the question
+plus a `pending` reply and the page polls. It uses the same model as extraction (workspace endpoint, else
+`AI_PROVIDER`), through tool calling. One question at a time per project; a reply that fails is shown as failed
+and the admin asks again.
+
+**The assistant proposes; a person approves.** It has exactly three tools — `propose_move_file`,
+`propose_attach_file`, `propose_confirm_review`. A tool call changes nothing: the server checks it against the
+snapshot (ids exist in this project, the file is on the source check, a quote has a supplier and all three
+amounts), writes the plain-English summary itself, and stores it as a proposal with Approve / Dismiss. Approving
+runs the same functions as the buttons (`moveItemFile`, `attachItemFile`, `confirmExtraction`) as the approving
+admin, so activity, validation and project checks are identical.
+
+**It can never delete or remove documents or photos.** There is no tool for it; any other tool name is refused
+when the reply is saved, and `applyChatAction` refuses any action type outside the three (tested).
+
 ## 5a. Email
 
 Resend, sent only from the Queue consumer. Notifications: *stage completed* (everyone with notifications on,

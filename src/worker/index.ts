@@ -8,6 +8,7 @@ import { clerk, requireRole, requireUser } from "./middleware/auth";
 import { handleQueue } from "./queue";
 import { adminRoutes } from "./routes/admin";
 import { aiSettingsRoutes } from "./routes/ai-settings";
+import { chatRoutes, projectChatRoutes } from "./routes/chat";
 import { extractionRoutes, projectQuoteRoutes, quoteRoutes, supplierRoutes } from "./routes/extractions";
 import { fileRoutes, projectFileRoutes } from "./routes/files";
 import { meRoutes } from "./routes/me";
@@ -31,7 +32,7 @@ app.use(clerk(), requireUser());
 // Viewers see only their assigned projects (lib/access.ts) and none of the workspace-wide pages.
 app.use("/projects/:id", requireProjectAccess());
 app.use("/projects/:id/*", requireProjectAccess());
-for (const path of ["/activity", "/extractions", "/suppliers", "/templates"]) {
+for (const path of ["/activity", "/chat", "/extractions", "/suppliers", "/templates"]) {
 	app.use(path, requireRole("admin"));
 	app.use(`${path}/*`, requireRole("admin"));
 }
@@ -46,6 +47,8 @@ app.route("/projects", projectFileRoutes);
 app.route("/files", fileRoutes);
 app.route("/projects", projectQuoteRoutes);
 app.route("/extractions", extractionRoutes);
+app.route("/projects", projectChatRoutes);
+app.route("/chat", chatRoutes);
 app.route("/quotes", quoteRoutes);
 app.route("/suppliers", supplierRoutes);
 app.route("/stages", stageRoutes);

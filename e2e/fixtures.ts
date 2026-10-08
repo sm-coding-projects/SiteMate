@@ -410,6 +410,52 @@ export function installApi(page: Page, role: "admin" | "viewer", opts: { slowIte
 					});
 				if (path === "/files/f1/url") return json(route, { url: "about:blank", expiresAt: NOW + DAY });
 				if (path.startsWith("/files/")) return json(route, { url: thumb(10), expiresAt: NOW + DAY });
+				if (path === "/projects/p1/chat")
+					return json(route, {
+						messages: [
+							{
+								id: "m1",
+								role: "user",
+								content: "Are any documents on the wrong checklist item?",
+								status: "done",
+								actions: [],
+								error: null,
+								author: { id: "u1", name: "Sam Site" },
+								createdAt: NOW - 600_000,
+							},
+							{
+								id: "m2",
+								role: "assistant",
+								content:
+									"The termite certificate is on the right check. The structural drawings belong on Engineering plans.",
+								status: "done",
+								actions: [
+									{
+										id: "a1",
+										type: "move_file",
+										summary:
+											"Move Structural drawings.pdf from “Signed contract” (Pre-construction) to “Engineering plans” (Pre-construction)",
+										reason: "They're engineering drawings, not the contract.",
+										params: { fileId: "f9", fromItemId: "s1i1", itemId: "s1i6" },
+										status: "proposed",
+									},
+									{
+										id: "a2",
+										type: "attach_file",
+										summary: "Attach Soil report.pdf to “Soil test” (Pre-construction)",
+										reason: null,
+										params: { fileId: "f8", itemId: "s1i5" },
+										status: "applied",
+										decidedBy: { id: "u1", name: "Sam Site" },
+										decidedAt: NOW - 300_000,
+									},
+								],
+								error: null,
+								author: null,
+								createdAt: NOW - 590_000,
+							},
+						],
+					});
 				if (path === "/suppliers")
 					return json(route, [
 						{
