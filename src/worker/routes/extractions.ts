@@ -35,6 +35,7 @@ import type { AppEnv } from "../types";
 import { assertProject } from "./projects";
 
 type Db = AppEnv["Variables"]["db"];
+export type ExtractionConfirmBody = z.output<typeof extractionConfirm>;
 
 const OPEN = ["queued", "processing", "needs_review", "failed"] as const;
 const FILE_CATEGORY_FOR: Record<string, "quote" | "invoice" | "certificate" | "plan" | "document"> = {
@@ -162,215 +163,227 @@ export const extractionRoutes = new Hono<AppEnv>()
 			const user = c.get("user");
 			const { id } = c.req.valid("param");
 			const body = c.req.valid("json");
-			const r = await loadExtraction(db, id);
-			if (r.ex.status === "queued" || r.ex.status === "processing")
-				throw conflict("Still reading this document");
-			const projectId = r.file.projectId;
-			if (body.stageId) {
-				const s = await db.query.projectStages.findFirst({
-					where: and(eq(projectStages.id, body.stageId), eq(projectStages.projectId, projectId)),
-				});
-				if (!s) throw badRequest("Stage is not part of this project");
-			}
-			const check = body.itemId
-				? await db
-						.select({ title: projectItems.title, stage: projectStages.name })
-						.from(projectItems)
-						.innerJoin(projectStages, eq(projectItems.projectStageId, projectStages.id))
-						.where(and(eq(projectItems.id, body.itemId), eq(projectStages.projectId, projectId)))
-						.get()
-				: null;
-			if (body.itemId && !check) throw badRequest("Checklist item is not part of this project");
-			const alreadyAttached =
-				body.itemId &&
-				(await db
-					.select({ fileId: itemFiles.fileId })
-					.from(itemFiles)
-					.where(and(eq(itemFiles.itemId, body.itemId), eq(itemFiles.fileId, r.file.id)))
-					.get());
+			return c.json(await confirmExtraction(db, user, id, body));
+		},
+	);
 
-			const now = Date.now();
-			const previous = (r.ex.fields as unknown as ExtractionFields | null) ?? null;
-			const statements: Statement[] = [];
-			let quoteId: string | null = null;
+/**
+ * A reviewer confirms (and may correct) the fields. Quotes create/update suppliers and quotes rows; with `itemId`
+ * the file is also attached to that check. Shared by the Review screen and approved Ask AI proposals.
+ */
+export async function confirmExtraction(
+	db: Db,
+	user: { id: string },
+	id: string,
+	body: ExtractionConfirmBody,
+) {
+	const r = await loadExtraction(db, id);
+	if (r.ex.status === "queued" || r.ex.status === "processing") throw conflict("Still reading this document");
+	const projectId = r.file.projectId;
+	if (body.stageId) {
+		const s = await db.query.projectStages.findFirst({
+			where: and(eq(projectStages.id, body.stageId), eq(projectStages.projectId, projectId)),
+		});
+		if (!s) throw badRequest("Stage is not part of this project");
+	}
+	const check = body.itemId
+		? await db
+				.select({ title: projectItems.title, stage: projectStages.name })
+				.from(projectItems)
+				.innerJoin(projectStages, eq(projectItems.projectStageId, projectStages.id))
+				.where(and(eq(projectItems.id, body.itemId), eq(projectStages.projectId, projectId)))
+				.get()
+		: null;
+	if (body.itemId && !check) throw badRequest("Checklist item is not part of this project");
+	const alreadyAttached =
+		body.itemId &&
+		(await db
+			.select({ fileId: itemFiles.fileId })
+			.from(itemFiles)
+			.where(and(eq(itemFiles.itemId, body.itemId), eq(itemFiles.fileId, r.file.id)))
+			.get());
 
-			if (body.documentType === "quote") {
-				const q = body.fields;
-				const allSuppliers = await loadSuppliers(db);
-				const validation = validateQuote(q, { suppliers: allSuppliers });
+	const now = Date.now();
+	const previous = (r.ex.fields as unknown as ExtractionFields | null) ?? null;
+	const statements: Statement[] = [];
+	let quoteId: string | null = null;
 
-				// Supplier: explicit choice → ABN/name match → new.
-				let supplier: { id: string; name: string; abn: string | null; trade: string | null } | null =
-					(body.supplierId ? allSuppliers.find((s) => s.id === body.supplierId) : null) ??
-					matchSupplier({ name: q.supplierName, abn: q.abn }, allSuppliers);
-				if (body.supplierId && !supplier) throw badRequest("Unknown supplier");
-				const abn = normalizeAbn(q.abn) || null;
-				let supplierId: string;
-				if (supplier) {
-					supplierId = supplier.id;
-					const existing = await db.query.suppliers.findFirst({ where: eq(suppliers.id, supplierId) });
-					// Fill gaps only; a reviewer's earlier corrections win.
-					const patch = {
-						...(!existing?.abn && abn ? { abn } : {}),
-						...(!existing?.trade && q.trade ? { trade: q.trade } : {}),
-						...(!existing?.email && q.supplierEmail ? { email: q.supplierEmail } : {}),
-						...(!existing?.phone && q.supplierPhone ? { phone: q.supplierPhone } : {}),
-					};
-					if (
-						Object.keys(patch).length &&
-						!(patch.abn && allSuppliers.some((s) => s.id !== supplierId && normalizeAbn(s.abn) === abn))
-					) {
-						statements.push(
-							db
-								.update(suppliers)
-								.set({ ...patch, updatedAt: now })
-								.where(eq(suppliers.id, supplierId)),
-						);
-					}
-				} else {
-					supplierId = ulid(now);
-					supplier = { id: supplierId, name: q.supplierName, abn, trade: q.trade };
-					statements.push(
-						db.insert(suppliers).values({
-							id: supplierId,
-							name: q.supplierName,
-							abn,
-							trade: q.trade,
-							email: q.supplierEmail ?? null,
-							phone: q.supplierPhone ?? null,
-							createdAt: now,
-							updatedAt: now,
-						}),
-					);
-				}
+	if (body.documentType === "quote") {
+		const q = body.fields;
+		const allSuppliers = await loadSuppliers(db);
+		const validation = validateQuote(q, { suppliers: allSuppliers });
 
-				const existingQuote = await db
-					.select({ id: quotes.id })
-					.from(quotes)
-					.where(eq(quotes.extractionId, id))
-					.get();
-				quoteId = existingQuote?.id ?? ulid(now);
-				const values = {
-					projectId,
-					fileId: r.file.id,
-					supplierId,
-					trade: q.trade,
-					quoteNumber: q.quoteNumber,
-					quoteDate: q.quoteDate,
-					validUntil: q.validUntil,
-					amountExGstCents: q.amountExGstCents,
-					gstCents: q.gstCents,
-					amountIncGstCents: q.amountIncGstCents,
-					extractionId: id,
-					updatedAt: now,
-				};
-				statements.push(
-					existingQuote
-						? db.update(quotes).set(values).where(eq(quotes.id, quoteId))
-						: db.insert(quotes).values({ id: quoteId, ...values, status: "pending", createdAt: now }),
-				);
+		// Supplier: explicit choice → ABN/name match → new.
+		let supplier: { id: string; name: string; abn: string | null; trade: string | null } | null =
+			(body.supplierId ? allSuppliers.find((s) => s.id === body.supplierId) : null) ??
+			matchSupplier({ name: q.supplierName, abn: q.abn }, allSuppliers);
+		if (body.supplierId && !supplier) throw badRequest("Unknown supplier");
+		const abn = normalizeAbn(q.abn) || null;
+		let supplierId: string;
+		if (supplier) {
+			supplierId = supplier.id;
+			const existing = await db.query.suppliers.findFirst({ where: eq(suppliers.id, supplierId) });
+			// Fill gaps only; a reviewer's earlier corrections win.
+			const patch = {
+				...(!existing?.abn && abn ? { abn } : {}),
+				...(!existing?.trade && q.trade ? { trade: q.trade } : {}),
+				...(!existing?.email && q.supplierEmail ? { email: q.supplierEmail } : {}),
+				...(!existing?.phone && q.supplierPhone ? { phone: q.supplierPhone } : {}),
+			};
+			if (
+				Object.keys(patch).length &&
+				!(patch.abn && allSuppliers.some((s) => s.id !== supplierId && normalizeAbn(s.abn) === abn))
+			) {
 				statements.push(
 					db
-						.update(documentExtractions)
-						.set({
-							status: "confirmed",
-							detectedType: "quote",
-							fields: {
-								...previous,
-								documentType: "quote",
-								quote: q,
-								supplierMatch: supplier,
-							} as unknown as Record<string, unknown>,
-							validation: { checks: validation.checks, warnings: validation.warnings },
-							reviewedBy: user.id,
-							reviewedAt: now,
-							error: null,
-							updatedAt: now,
-						})
-						.where(eq(documentExtractions.id, id)),
-				);
-				if (!existingQuote) {
-					statements.push(
-						logActivity(
-							db,
-							{
-								projectId,
-								actorId: user.id,
-								action: "quote.created",
-								entityType: "quote",
-								entityId: quoteId,
-								meta: { supplier: q.supplierName, incGstCents: q.amountIncGstCents, trade: q.trade },
-							},
-							now,
-						),
-					);
-				}
-			} else {
-				statements.push(
-					db
-						.update(documentExtractions)
-						.set({
-							status: "confirmed",
-							detectedType: body.documentType,
-							fields: {
-								...previous,
-								documentType: body.documentType,
-								generic: body.fields,
-							} as unknown as Record<string, unknown>,
-							reviewedBy: user.id,
-							reviewedAt: now,
-							error: null,
-							updatedAt: now,
-						})
-						.where(eq(documentExtractions.id, id)),
+						.update(suppliers)
+						.set({ ...patch, updatedAt: now })
+						.where(eq(suppliers.id, supplierId)),
 				);
 			}
-
+		} else {
+			supplierId = ulid(now);
+			supplier = { id: supplierId, name: q.supplierName, abn, trade: q.trade };
 			statements.push(
-				db
-					.update(files)
-					.set({
-						category: FILE_CATEGORY_FOR[body.documentType] ?? "document",
-						...(body.stageId !== undefined ? { projectStageId: body.stageId } : {}),
-					})
-					.where(eq(files.id, r.file.id)),
-				touchProject(db, projectId, now),
+				db.insert(suppliers).values({
+					id: supplierId,
+					name: q.supplierName,
+					abn,
+					trade: q.trade,
+					email: q.supplierEmail ?? null,
+					phone: q.supplierPhone ?? null,
+					createdAt: now,
+					updatedAt: now,
+				}),
+			);
+		}
+
+		const existingQuote = await db
+			.select({ id: quotes.id })
+			.from(quotes)
+			.where(eq(quotes.extractionId, id))
+			.get();
+		quoteId = existingQuote?.id ?? ulid(now);
+		const values = {
+			projectId,
+			fileId: r.file.id,
+			supplierId,
+			trade: q.trade,
+			quoteNumber: q.quoteNumber,
+			quoteDate: q.quoteDate,
+			validUntil: q.validUntil,
+			amountExGstCents: q.amountExGstCents,
+			gstCents: q.gstCents,
+			amountIncGstCents: q.amountIncGstCents,
+			extractionId: id,
+			updatedAt: now,
+		};
+		statements.push(
+			existingQuote
+				? db.update(quotes).set(values).where(eq(quotes.id, quoteId))
+				: db.insert(quotes).values({ id: quoteId, ...values, status: "pending", createdAt: now }),
+		);
+		statements.push(
+			db
+				.update(documentExtractions)
+				.set({
+					status: "confirmed",
+					detectedType: "quote",
+					fields: {
+						...previous,
+						documentType: "quote",
+						quote: q,
+						supplierMatch: supplier,
+					} as unknown as Record<string, unknown>,
+					validation: { checks: validation.checks, warnings: validation.warnings },
+					reviewedBy: user.id,
+					reviewedAt: now,
+					error: null,
+					updatedAt: now,
+				})
+				.where(eq(documentExtractions.id, id)),
+		);
+		if (!existingQuote) {
+			statements.push(
 				logActivity(
 					db,
 					{
 						projectId,
 						actorId: user.id,
-						action: "extraction.confirmed",
-						entityType: "extraction",
-						entityId: id,
-						meta: { filename: r.file.filename, documentType: body.documentType },
+						action: "quote.created",
+						entityType: "quote",
+						entityId: quoteId,
+						meta: { supplier: q.supplierName, incGstCents: q.amountIncGstCents, trade: q.trade },
 					},
 					now,
 				),
 			);
-			if (body.itemId && check && !alreadyAttached) {
-				statements.push(
-					db
-						.insert(itemFiles)
-						.values({ itemId: body.itemId, fileId: r.file.id, attachedBy: user.id, createdAt: now }),
-					logActivity(
-						db,
-						{
-							projectId,
-							actorId: user.id,
-							action: "item.files_attached",
-							entityType: "item",
-							entityId: body.itemId,
-							meta: { item: check.title, stage: check.stage, count: 1, file: r.file.filename },
-						},
-						now + 1,
-					),
-				);
-			}
-			await runBatch(db, statements);
-			return c.json({ id, status: "confirmed", quoteId });
-		},
+		}
+	} else {
+		statements.push(
+			db
+				.update(documentExtractions)
+				.set({
+					status: "confirmed",
+					detectedType: body.documentType,
+					fields: {
+						...previous,
+						documentType: body.documentType,
+						generic: body.fields,
+					} as unknown as Record<string, unknown>,
+					reviewedBy: user.id,
+					reviewedAt: now,
+					error: null,
+					updatedAt: now,
+				})
+				.where(eq(documentExtractions.id, id)),
+		);
+	}
+
+	statements.push(
+		db
+			.update(files)
+			.set({
+				category: FILE_CATEGORY_FOR[body.documentType] ?? "document",
+				...(body.stageId !== undefined ? { projectStageId: body.stageId } : {}),
+			})
+			.where(eq(files.id, r.file.id)),
+		touchProject(db, projectId, now),
+		logActivity(
+			db,
+			{
+				projectId,
+				actorId: user.id,
+				action: "extraction.confirmed",
+				entityType: "extraction",
+				entityId: id,
+				meta: { filename: r.file.filename, documentType: body.documentType },
+			},
+			now,
+		),
 	);
+	if (body.itemId && check && !alreadyAttached) {
+		statements.push(
+			db
+				.insert(itemFiles)
+				.values({ itemId: body.itemId, fileId: r.file.id, attachedBy: user.id, createdAt: now }),
+			logActivity(
+				db,
+				{
+					projectId,
+					actorId: user.id,
+					action: "item.files_attached",
+					entityType: "item",
+					entityId: body.itemId,
+					meta: { item: check.title, stage: check.stage, count: 1, file: r.file.filename },
+				},
+				now + 1,
+			),
+		);
+	}
+	await runBatch(db, statements);
+	return { id, status: "confirmed" as const, quoteId };
+}
 
 // ── Quotes ───────────────────────────────────────────────────────────────────
 

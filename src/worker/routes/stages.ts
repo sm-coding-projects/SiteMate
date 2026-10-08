@@ -54,6 +54,85 @@ async function attachedFile(db: Db, itemId: string, fileId: string) {
 	return row;
 }
 
+/** Moves one file from one check to another in the same project (any stage). Used by the route and Ask AI. */
+export async function moveItemFile(db: Db, user: { id: string }, id: string, fileId: string, toId: string) {
+	if (toId === id) throw badRequest("It's already on that check");
+	const [from, to] = await Promise.all([loadItem(db, id), loadItem(db, toId)]);
+	if (to.stage.projectId !== from.stage.projectId) throw badRequest("That check is in another project");
+	const file = await attachedFile(db, id, fileId);
+	const now = Date.now();
+	await runBatch(db, [
+		db.delete(itemFiles).where(and(eq(itemFiles.itemId, id), eq(itemFiles.fileId, fileId))),
+		// Already on the target check: the move just takes it off this one.
+		db
+			.insert(itemFiles)
+			.values({ itemId: toId, fileId, attachedBy: user.id, createdAt: now })
+			.onConflictDoNothing(),
+		touchProject(db, from.stage.projectId, now),
+		logActivity(
+			db,
+			{
+				projectId: from.stage.projectId,
+				actorId: user.id,
+				action: "item.file_moved",
+				entityType: "item",
+				entityId: toId,
+				meta: {
+					file: file.filename,
+					from: from.item.title,
+					fromStage: from.stage.name,
+					item: to.item.title,
+					stage: to.stage.name,
+				},
+			},
+			now,
+		),
+	]);
+	return { id: toId, fileId, moved: true };
+}
+
+/** Attaches one project file to a check (no-op if it's already there). Used by Ask AI. */
+export async function attachItemFile(db: Db, user: { id: string }, itemId: string, fileId: string) {
+	const { item, stage } = await loadItem(db, itemId);
+	const file = await db
+		.select({ filename: files.filename })
+		.from(files)
+		.where(
+			and(
+				eq(files.id, fileId),
+				eq(files.projectId, stage.projectId),
+				isNull(files.deletedAt),
+				eq(files.uploadStatus, "uploaded"),
+			),
+		)
+		.get();
+	if (!file) throw badRequest("That file isn't in this project");
+	const already = await db
+		.select({ fileId: itemFiles.fileId })
+		.from(itemFiles)
+		.where(and(eq(itemFiles.itemId, itemId), eq(itemFiles.fileId, fileId)))
+		.get();
+	if (already) return { id: itemId, fileId, changed: false };
+	const now = Date.now();
+	await runBatch(db, [
+		db.insert(itemFiles).values({ itemId, fileId, attachedBy: user.id, createdAt: now }),
+		touchProject(db, stage.projectId, now),
+		logActivity(
+			db,
+			{
+				projectId: stage.projectId,
+				actorId: user.id,
+				action: "item.files_attached",
+				entityType: "item",
+				entityId: itemId,
+				meta: { item: item.title, stage: stage.name, count: 1, file: file.filename },
+			},
+			now,
+		),
+	]);
+	return { id: itemId, fileId, changed: true };
+}
+
 async function itemCounts(db: Db, stageId: string) {
 	const row = await db
 		.select({ total: count(), done: sql<number>`count(${projectItems.completedAt})` })
@@ -552,39 +631,7 @@ export const itemRoutes = new Hono<AppEnv>()
 			const user = c.get("user");
 			const { id, fileId } = c.req.valid("param");
 			const { itemId: toId } = c.req.valid("json");
-			if (toId === id) throw badRequest("It's already on that check");
-			const [from, to] = await Promise.all([loadItem(db, id), loadItem(db, toId)]);
-			if (to.stage.projectId !== from.stage.projectId) throw badRequest("That check is in another project");
-			const file = await attachedFile(db, id, fileId);
-			const now = Date.now();
-			await runBatch(db, [
-				db.delete(itemFiles).where(and(eq(itemFiles.itemId, id), eq(itemFiles.fileId, fileId))),
-				// Already on the target check: the move just takes it off this one.
-				db
-					.insert(itemFiles)
-					.values({ itemId: toId, fileId, attachedBy: user.id, createdAt: now })
-					.onConflictDoNothing(),
-				touchProject(db, from.stage.projectId, now),
-				logActivity(
-					db,
-					{
-						projectId: from.stage.projectId,
-						actorId: user.id,
-						action: "item.file_moved",
-						entityType: "item",
-						entityId: toId,
-						meta: {
-							file: file.filename,
-							from: from.item.title,
-							fromStage: from.stage.name,
-							item: to.item.title,
-							stage: to.stage.name,
-						},
-					},
-					now,
-				),
-			]);
-			return c.json({ id: toId, fileId, moved: true });
+			return c.json(await moveItemFile(db, user, id, fileId, toId));
 		},
 	)
 

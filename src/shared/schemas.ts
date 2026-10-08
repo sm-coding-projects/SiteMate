@@ -24,6 +24,13 @@ export const AU_STATES = ["ACT", "NSW", "NT", "QLD", "SA", "TAS", "VIC", "WA"] a
 export const ROLE_VALUES = ["admin", "viewer"] as const;
 /** Wire formats a custom AI endpoint can speak. */
 export const AI_PROTOCOLS = ["openai", "anthropic"] as const;
+export const CHAT_ROLES = ["user", "assistant"] as const;
+export const CHAT_STATUSES = ["pending", "done", "failed"] as const;
+/**
+ * Everything Ask AI may propose. Nothing here deletes or detaches: the assistant can never remove documents or
+ * photos (docs/DESIGN.md §5b). Any other type is refused when a proposal is saved and again when it's approved.
+ */
+export const CHAT_ACTION_TYPES = ["move_file", "attach_file", "confirm_review"] as const;
 
 // ── Primitives ───────────────────────────────────────────────────────────────
 
@@ -358,3 +365,9 @@ export const aiModelsQuery = z.object({
 export const aiSettingsUpdate = aiModelsQuery.extend({
 	model: z.string().trim().min(1, "Choose a model").max(200),
 });
+
+// ── Ask AI ───────────────────────────────────────────────────────────────────
+
+export const chatSend = z.object({ message: z.string().trim().min(1, "Ask something").max(4000) });
+export const chatActionParam = z.object({ id: idSchema, actionId: z.string().min(1).max(40) });
+export const chatDecision = z.object({ decision: z.enum(["approve", "dismiss"]) });

@@ -10,7 +10,15 @@ import { aiSettings } from "../../db/schema";
 import type { Db } from "../db";
 import { decryptSecret } from "../lib/secret-box";
 import type { Bindings } from "../types";
-import { complete, type Endpoint, stripThinking } from "./endpoint";
+import {
+	type ChatTurn,
+	complete,
+	completeWithTools,
+	type Endpoint,
+	stripThinking,
+	type ToolCall,
+	type ToolDef,
+} from "./endpoint";
 import { looksScanned, pdfPageCount, pdfPageJpegs } from "./pdf-scan";
 import { MAX_DOCUMENT_CHARS, SYSTEM_PROMPT, TRANSCRIBE_PROMPT } from "./prompts";
 
@@ -334,4 +342,77 @@ export function selectProvider(env: Bindings): Provider {
 		return openaiCompatible(env, env.OPENAI_COMPAT_API_KEY);
 	if (wanted !== "workers-ai") console.warn(`AI_PROVIDER=${wanted} has no API key; using workers-ai`);
 	return workersAi(env);
+}
+
+// ── Ask AI ───────────────────────────────────────────────────────────────────
+
+/** Tool arguments as an object; malformed JSON becomes {} so that one call is refused, not the whole reply. */
+function safeArgs(v: unknown): Record<string, unknown> {
+	if (v && typeof v === "object") return v as Record<string, unknown>;
+	if (typeof v !== "string") return {};
+	try {
+		const o = parseJsonLoose(v);
+		return o && typeof o === "object" ? (o as Record<string, unknown>) : {};
+	} catch {
+		return {};
+	}
+}
+
+export interface ChatModel {
+	name: string;
+	run(opts: {
+		system: string;
+		turns: ChatTurn[];
+		tools: ToolDef[];
+	}): Promise<{ text: string; calls: ToolCall[] }>;
+}
+
+/** The workspace endpoint when saved, else the env provider; Workers AI as the free default. */
+export async function resolveChatModel(env: Bindings, db: Db): Promise<ChatModel> {
+	const saved = await loadCustomEndpoint(env, db);
+	const viaEndpoint = (endpoint: Endpoint, model: string): ChatModel => ({
+		name: model,
+		run: (o) => completeWithTools(endpoint, model, { ...o, maxTokens: CUSTOM_MAX_TOKENS }),
+	});
+	if (saved) return viaEndpoint(saved.endpoint, saved.row.model);
+	const wanted = env.AI_PROVIDER || "workers-ai";
+	if (wanted === "anthropic" && env.ANTHROPIC_API_KEY) {
+		return viaEndpoint(
+			{ protocol: "anthropic", baseUrl: "https://api.anthropic.com/v1", apiKey: env.ANTHROPIC_API_KEY },
+			env.ANTHROPIC_MODEL || "claude-opus-5-5",
+		);
+	}
+	if (wanted === "openai-compatible" && env.OPENAI_COMPAT_API_KEY && env.OPENAI_COMPAT_BASE_URL) {
+		return viaEndpoint(
+			{
+				protocol: "openai",
+				baseUrl: env.OPENAI_COMPAT_BASE_URL.replace(/\/$/, ""),
+				apiKey: env.OPENAI_COMPAT_API_KEY,
+			},
+			env.OPENAI_COMPAT_MODEL || "openai/gpt-5-mini",
+		);
+	}
+	const model = (env.WORKERS_AI_MODEL || DEFAULT_WORKERS_AI_MODEL) as typeof DEFAULT_WORKERS_AI_MODEL;
+	return {
+		name: model,
+		async run({ system, turns, tools }) {
+			const out = (await env.AI.run(
+				model,
+				{
+					messages: [{ role: "system", content: system }, ...turns],
+					tools: tools.map((t) => ({ type: "function", function: t })),
+					max_tokens: 4096,
+					temperature: 0.2,
+				} as never,
+				gatewayOptions(env, { step: "chat" }),
+			)) as { response?: unknown; tool_calls?: { name?: string; arguments?: unknown }[] };
+			const calls = (out.tool_calls ?? [])
+				.filter((c) => typeof c.name === "string")
+				.map((c) => ({
+					name: c.name as string,
+					args: safeArgs(c.arguments),
+				}));
+			return { text: stripThinking(String(out.response ?? "")), calls };
+		},
+	};
 }

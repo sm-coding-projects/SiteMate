@@ -1,4 +1,4 @@
-import { FolderKanban, History, ScanText, UserRound, UsersRound } from "lucide-react";
+import { FolderKanban, History, ScanText, Sparkles, UserRound, UsersRound } from "lucide-react";
 
 /**
  * Desktop shows the "workspace" group in the sidebar; Account lives in the user block at the bottom.
@@ -14,6 +14,7 @@ export const NAV = [
 		adminOnly: false,
 	},
 	{ to: "/review", label: "Review", icon: ScanText, group: "workspace", mobile: true, adminOnly: false },
+	{ to: "/ask", label: "Ask AI", icon: Sparkles, group: "workspace", mobile: true, adminOnly: true },
 	{ to: "/activity", label: "Activity", icon: History, group: "workspace", mobile: true, adminOnly: false },
 	{ to: "/team", label: "Team", icon: UsersRound, group: "workspace", mobile: false, adminOnly: true },
 	{ to: "/account", label: "Account", icon: UserRound, group: "you", mobile: true, adminOnly: false },

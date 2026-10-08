@@ -350,6 +350,43 @@ export interface AiTestResult {
 export type JobMessage =
 	| { type: "ping"; requestedBy: string; at: number }
 	| { type: "extract"; extractionId: string }
+	| { type: "chat"; messageId: string }
 	| { type: "notify"; kind: "stage_completed"; projectId: string; stageId: string; actorId: string }
 	| { type: "notify"; kind: "extraction_ready"; extractionId: string }
 	| { type: "notify"; kind: "test"; to: string; requestedBy: string; at: number };
+
+// ── Ask AI ───────────────────────────────────────────────────────────────────
+
+export type ChatActionType = typeof import("./schemas").CHAT_ACTION_TYPES[number];
+
+/** A change the assistant proposes. Nothing happens until an admin approves it. */
+export interface ChatAction {
+	id: string;
+	type: ChatActionType;
+	/** Plain-English description, written by the server from the validated ids (not by the model). */
+	summary: string;
+	/** The model's one-line reason. */
+	reason: string | null;
+	params: {
+		fileId?: string;
+		fromItemId?: string;
+		itemId?: string;
+		extractionId?: string;
+		stageId?: string | null;
+	};
+	status: "proposed" | "applied" | "dismissed" | "failed";
+	error?: string | null;
+	decidedBy?: { id: string; name: string | null } | null;
+	decidedAt?: number | null;
+}
+
+export interface ChatMessage {
+	id: string;
+	role: "user" | "assistant";
+	content: string;
+	status: "pending" | "done" | "failed";
+	actions: ChatAction[];
+	error: string | null;
+	author: { id: string; name: string | null } | null;
+	createdAt: number;
+}

@@ -71,6 +71,13 @@
       "when": 1791415248856,
       "tag": "0009_backfill_last_active",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791418228726,
+      "tag": "0010_ai_chat",
+      "breakpoints": true
     }
   ]
 }
