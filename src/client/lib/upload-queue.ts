@@ -10,6 +10,8 @@ export type UploadStatus = "queued" | "uploading" | "waiting" | "failed";
 
 export interface UploadJob {
 	id: string;
+	/** Clerk user who queued it: only their session may see or send it. */
+	ownerId: string;
 	projectId: string;
 	category: string;
 	stageId: string | null;
@@ -73,15 +75,22 @@ const forget = (id: string) => idb("readwrite", (s) => s.delete(id)).catch(() =>
 type GetToken = () => Promise<string | null>;
 let getToken: GetToken = async () => null;
 let onUploaded: (projectId: string) => void = () => {};
+let userId: string | null = null;
 let jobs: UploadJob[] = [];
 let snapshot: readonly UploadJob[] = [];
 let running = false;
-let started = false;
+let listening = false;
+let activeXhr: XMLHttpRequest | undefined;
 let wakeTimer: ReturnType<typeof setTimeout> | undefined;
+let ownerTimer: ReturnType<typeof setTimeout> | undefined;
+const restored = new Set<string>();
 const listeners = new Set<() => void>();
 
+/** Jobs belong to whoever queued them: everyone else's stay hidden and unsent. */
+const mine = (job: UploadJob) => job.ownerId === userId;
+
 function emit() {
-	snapshot = [...jobs];
+	snapshot = jobs.filter(mine);
 	for (const l of listeners) l();
 }
 
@@ -98,32 +107,53 @@ export const uploadQueue = {
 	},
 	getSnapshot: () => snapshot,
 
-	/** Called once by the app shell with Clerk's token getter. Restores unfinished uploads. */
-	async start(tokenGetter: GetToken, uploaded: (projectId: string) => void) {
+	/** Called by the app shell with the signed-in user and Clerk's token getter. Restores their unfinished uploads. */
+	async start(owner: string, tokenGetter: GetToken, uploaded: (projectId: string) => void) {
+		if (owner !== userId) activeXhr?.abort();
+		userId = owner;
 		getToken = tokenGetter;
 		onUploaded = uploaded;
-		if (started) return;
-		started = true;
-		try {
-			const saved = await idb<UploadJob[]>("readonly", (s) => s.getAll() as IDBRequest<UploadJob[]>);
-			for (const j of saved)
-				if (!jobs.some((x) => x.id === j.id))
-					jobs.push({ ...j, status: j.status === "failed" ? "failed" : "queued" });
-			jobs.sort((a, b) => a.createdAt - b.createdAt);
-			emit();
-		} catch {
-			// Private browsing etc.: queue still works in memory for this session.
+		emit();
+		if (!listening) {
+			listening = true;
+			window.addEventListener("online", () => uploadQueue.kick(true));
 		}
-		window.addEventListener("online", () => uploadQueue.kick(true));
+		if (!restored.has(owner)) {
+			restored.add(owner);
+			try {
+				const saved = await idb<UploadJob[]>("readonly", (s) => s.getAll() as IDBRequest<UploadJob[]>);
+				for (const j of saved) {
+					// Queued before jobs recorded their owner: whose it is can't be known, so drop it unsent.
+					if (!j.ownerId) void forget(j.id);
+					else if (j.ownerId === owner && !jobs.some((x) => x.id === j.id))
+						jobs.push({ ...j, status: j.status === "failed" ? "failed" : "queued" });
+				}
+				jobs.sort((a, b) => a.createdAt - b.createdAt);
+				emit();
+			} catch {
+				// Private browsing etc.: queue still works in memory for this session.
+			}
+		}
 		uploadQueue.kick();
 	},
 
+	/** `owner` signed out or switched account: hide and pause their uploads until they're back. */
+	stop(owner: string) {
+		if (owner !== userId) return;
+		userId = null;
+		activeXhr?.abort();
+		emit();
+	},
+
 	async add(items: NewUpload[]) {
+		const owner = userId;
+		if (!owner) throw new Error("You're signed out. Sign in again to upload.");
 		const now = Date.now();
 		for (const [i, item] of items.entries()) {
 			const job: UploadJob = {
 				...item,
 				id: `${now}-${i}-${Math.random().toString(36).slice(2, 8)}`,
+				ownerId: owner,
 				status: "queued",
 				progress: 0,
 				attempts: 0,
@@ -164,12 +194,17 @@ async function run() {
 	try {
 		let job: UploadJob | undefined;
 		// biome-ignore lint/suspicious/noAssignInExpressions: queue drain loop
-		while ((job = jobs.find((j) => j.status === "queued"))) {
+		while ((job = jobs.find((j) => mine(j) && j.status === "queued"))) {
 			if (!navigator.onLine) {
 				update(job, { status: "waiting", error: "Waiting for signal" }, false);
 				continue;
 			}
-			await process(job);
+			if (await process(job)) {
+				// Clerk switched account but the app hasn't caught up yet: look again shortly, don't spin.
+				clearTimeout(ownerTimer);
+				ownerTimer = setTimeout(() => uploadQueue.kick(), 2000);
+				break;
+			}
 		}
 	} finally {
 		running = false;
@@ -178,9 +213,19 @@ async function run() {
 
 class Retryable extends Error {}
 
+/** Thrown by the token getter when Clerk has already switched away from the queue's user. */
+export class OwnerChanged extends Error {}
+
 async function process(job: UploadJob) {
+	// Each step runs with whoever is signed in now: stop as soon as that's no longer the job's owner.
+	const own = () => {
+		if (!mine(job)) throw new Error("Signed out");
+	};
 	update(job, { status: "uploading", error: undefined }, false);
-	const api = <T>(path: string, init?: RequestInit) => apiFetch<T>(path, getToken, init);
+	const api = <T>(path: string, init?: RequestInit) => {
+		own();
+		return apiFetch<T>(path, getToken, init);
+	};
 	const thumbBody = job.thumb ? { thumbBytes: job.thumb.size, thumbMimeType: job.thumbMimeType } : {};
 	try {
 		if (!job.fileId || !job.ticket) {
@@ -207,10 +252,12 @@ async function process(job: UploadJob) {
 		}
 		const ticket = job.ticket as UploadTicket;
 		const thumbShare = job.thumb ? 0.1 : 0;
+		own();
 		await put(ticket.uploadUrl, ticket.uploadHeaders, job.blob, (p) =>
 			update(job, { progress: p * (0.95 - thumbShare) }, false),
 		);
 		if (job.thumb && ticket.thumbUploadUrl) {
+			own();
 			await put(ticket.thumbUploadUrl, ticket.thumbUploadHeaders ?? {}, job.thumb, (p) =>
 				update(job, { progress: 0.85 + p * 0.1 }, false),
 			);
@@ -222,6 +269,11 @@ async function process(job: UploadJob) {
 		emit();
 		onUploaded(job.projectId);
 	} catch (err) {
+		if (!mine(job) || err instanceof OwnerChanged) {
+			// Owner signed out or switched account mid-upload: park it, keeping its file and ticket, until they're back.
+			update(job, { status: "queued", progress: 0 }, false);
+			return mine(job);
+		}
 		const transient =
 			err instanceof Retryable ||
 			(err instanceof ApiRequestError &&
@@ -253,6 +305,7 @@ async function process(job: UploadJob) {
 function put(url: string, headers: Record<string, string>, body: Blob, onProgress: (p: number) => void) {
 	return new Promise<void>((resolve, reject) => {
 		const xhr = new XMLHttpRequest();
+		activeXhr = xhr;
 		xhr.open("PUT", url);
 		for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
 		xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
@@ -264,6 +317,10 @@ function put(url: string, headers: Record<string, string>, body: Blob, onProgres
 		};
 		xhr.onerror = () => reject(new Retryable("network"));
 		xhr.ontimeout = () => reject(new Retryable("timeout"));
+		xhr.onabort = () => reject(new Retryable("aborted"));
+		xhr.onloadend = () => {
+			if (activeXhr === xhr) activeXhr = undefined;
+		};
 		xhr.timeout = 5 * 60_000;
 		xhr.send(body);
 	});

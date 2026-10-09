@@ -8,6 +8,7 @@ import { AdminOnly, AppShell } from "@/components/layout/app-shell";
 import { RequireAuth } from "@/components/require-auth";
 import { RouteError } from "@/components/route-error";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { UploadQueueOwner } from "@/components/upload-tray";
 import { ApiRequestError } from "@/lib/api";
 import { siteUrl } from "@/lib/hosts";
 import { AccountPage } from "@/pages/account";
@@ -89,6 +90,7 @@ if (!root) throw new Error("#root missing");
 
 const app = (
 	<QueryClientProvider client={queryClient}>
+		<UploadQueueOwner />
 		<TooltipProvider delayDuration={200}>
 			<RouterProvider router={router} />
 		</TooltipProvider>

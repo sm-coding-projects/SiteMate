@@ -7,7 +7,7 @@ import type { ReactNode } from "react";
 export const ClerkProvider = ({ children }: { children: ReactNode }) => <>{children}</>;
 // One function for the whole session, as Clerk's own getToken is: hooks depend on its identity.
 const getToken = async () => "e2e-token";
-export const useAuth = () => ({ isLoaded: true, isSignedIn: true, getToken });
+export const useAuth = () => ({ isLoaded: true, isSignedIn: true, userId: "user_e2e", getToken });
 export const useUser = () => ({
 	isLoaded: true,
 	user: {
@@ -18,6 +18,8 @@ export const useUser = () => ({
 		publicMetadata: { role: (globalThis as { __E2E_ROLE?: string }).__E2E_ROLE ?? "admin" },
 	},
 });
-export const useClerk = () => ({ signOut: async () => {}, openUserProfile: () => {} });
+// Stable, like the real Clerk instance: the upload tray's effect depends on its identity.
+const clerk = { user: { id: "user_e2e" }, signOut: async () => {}, openUserProfile: () => {} };
+export const useClerk = () => clerk;
 export const SignIn = () => <div data-testid="clerk-sign-in">Clerk sign-in</div>;
 export const SignUp = () => <div data-testid="clerk-sign-up">Clerk sign-up</div>;

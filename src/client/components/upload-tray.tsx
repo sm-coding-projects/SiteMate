@@ -1,26 +1,47 @@
-import { useAuth } from "@clerk/react";
+import { useAuth, useClerk } from "@clerk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, CloudOff, RotateCcw, TriangleAlert, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useUploads } from "@/hooks/use-uploads";
 import { formatBytes } from "@/lib/format";
-import { uploadQueue } from "@/lib/upload-queue";
+import { OwnerChanged, uploadQueue } from "@/lib/upload-queue";
 import { cn } from "@/lib/utils";
+
+/**
+ * Pauses the upload queue when its user signs out or switches account, whichever route that happens
+ * on. Rendered once at the app root, outside the router.
+ */
+export function UploadQueueOwner() {
+	const { userId } = useAuth();
+	useEffect(() => {
+		if (!userId) return;
+		return () => uploadQueue.stop(userId);
+	}, [userId]);
+	return null;
+}
 
 /**
  * Starts the persistent upload queue and shows what's in flight. Sits above the mobile tab bar so it
  * stays visible while the user keeps working.
  */
 export function UploadTray() {
-	const { getToken } = useAuth();
+	const { getToken, userId } = useAuth();
+	const clerk = useClerk();
 	const qc = useQueryClient();
 	const jobs = useUploads();
 	const [open, setOpen] = useState(false);
 
 	useEffect(() => {
+		if (!userId) return;
 		void uploadQueue.start(
-			() => getToken(),
+			userId,
+			async () => {
+				const token = await getToken();
+				// Never send this user's uploads as whoever signed in after them, not even via the session cookie.
+				if (clerk.user?.id !== userId) throw new OwnerChanged("Signed out");
+				return token;
+			},
 			(projectId) => {
 				qc.invalidateQueries({ queryKey: ["project", projectId] });
 				qc.invalidateQueries({ queryKey: ["projects"] });
@@ -28,7 +49,7 @@ export function UploadTray() {
 				qc.invalidateQueries({ queryKey: ["extractions"] });
 			},
 		);
-	}, [getToken, qc]);
+	}, [getToken, userId, clerk, qc]);
 
 	if (jobs.length === 0) return null;
 	const failed = jobs.filter((j) => j.status === "failed").length;
