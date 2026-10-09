@@ -277,9 +277,11 @@ export const adminRoutes = new Hono<AppEnv>()
 		const updated = await clerk.users.updateUserMetadata(id, { publicMetadata: { role } }).catch(clerkError);
 		const email = emailOf(updated);
 		const db = c.get("db");
-		// The session token picks the new role up on its next refresh (≤ 1 min); update our copy now.
+		// The session token picks the new role up on its next refresh (≤ 1 min); update our copy now. Tokens issued
+		// before this keep the old role, so requireUser checks them against roleChangedAt.
+		const now = Date.now();
 		await db.batch([
-			db.update(users).set({ role, updatedAt: Date.now() }).where(eq(users.id, id)),
+			db.update(users).set({ role, roleChangedAt: now, updatedAt: now }).where(eq(users.id, id)),
 			logActivity(db, {
 				actorId: me.id,
 				action: "user.role_changed",

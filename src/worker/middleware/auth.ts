@@ -32,6 +32,8 @@ interface SessionClaims {
 	email?: string;
 	name?: string;
 	role?: string;
+	/** Standard JWT claim: when Clerk issued the token, in whole seconds. */
+	iat?: number;
 }
 
 /**
@@ -68,6 +70,15 @@ export const requireUser = () =>
 			if (Array.isArray(ids)) invitedProjectIds = ids.filter((x): x is string => typeof x === "string");
 		}
 
+		// A token issued before the role last changed (iat is whole seconds, so that same second counts) carries a
+		// stale role. It never overwrites the stored role, and never grants more than it carried: a demotion applies
+		// to it at once, a promotion only from the next token.
+		let staleRole: Role | null = null;
+		if (profile && existing?.roleChangedAt != null && (claims.iat ?? 0) * 1000 <= existing.roleChangedAt) {
+			staleRole = profile.role;
+			profile.role = existing.role;
+		}
+
 		let me: Me;
 		if (!profile) {
 			me = existing as Me;
@@ -79,10 +90,14 @@ export const requireUser = () =>
 			me = existing;
 		} else {
 			const now = Date.now();
+			const roleChanged = existing !== undefined && existing.role !== profile.role;
 			await db
 				.insert(users)
 				.values({ id: auth.userId, ...profile, createdAt: now, updatedAt: now })
-				.onConflictDoUpdate({ target: users.id, set: { ...profile, updatedAt: now } });
+				.onConflictDoUpdate({
+					target: users.id,
+					set: { ...profile, ...(roleChanged ? { roleChangedAt: now } : {}), updatedAt: now },
+				});
 			me = { id: auth.userId, ...profile };
 			if (!existing && me.role === "viewer" && invitedProjectIds.length > 0) {
 				// Only projects that still exist (one may have been deleted since the invitation).
@@ -97,7 +112,9 @@ export const requireUser = () =>
 			await db.update(users).set({ lastActiveAt: now }).where(eq(users.id, me.id));
 		}
 
-		c.set("user", { id: me.id, email: me.email, name: me.name, role: me.role });
+		// A stale token gets the lesser of its role and the stored one (admin and viewer are the only roles).
+		const role = staleRole === "viewer" ? "viewer" : me.role;
+		c.set("user", { id: me.id, email: me.email, name: me.name, role });
 		await next();
 	});
 

@@ -8,6 +8,14 @@
 /** Below this, an embedded JPEG is a logo or stamp, not a scanned page. */
 const MIN_PAGE_IMAGE_BYTES = 30 * 1024;
 
+/**
+ * Bounds on the scan, so a crafted upload can't make it burn the queue consumer's CPU. A stream's dictionary
+ * sits right before `stream` and runs to a few hundred bytes; real PDFs have nowhere near these totals.
+ */
+const MAX_DICT_BYTES = 4 * 1024;
+const MAX_STREAMS = 20_000;
+const MAX_DICT_BYTES_SCANNED = 8 * 1024 * 1024;
+
 /** Full-page JPEGs embedded in the PDF, in file order. Images with any other filter (Flate, JBIG2…) are skipped. */
 export function pdfPageJpegs(bytes: ArrayBuffer): Uint8Array[] {
 	const data = new Uint8Array(bytes);
@@ -15,16 +23,20 @@ export function pdfPageJpegs(bytes: ArrayBuffer): Uint8Array[] {
 	const src = new TextDecoder("latin1").decode(data);
 	const out: Uint8Array[] = [];
 	let from = 0;
-	for (;;) {
+	let scanned = 0;
+	for (let streams = 0; streams < MAX_STREAMS && scanned < MAX_DICT_BYTES_SCANNED; streams++) {
 		const start = src.indexOf("stream", from);
 		if (start < 0) break;
 		const end = src.indexOf("endstream", start + 6);
 		if (end < 0) break;
 		from = end + 9;
 		if (src.startsWith("end", start - 3)) continue; // matched the tail of a previous "endstream"
-		const dictStart = src.lastIndexOf("<<", start);
-		const dict = dictStart >= 0 ? src.slice(dictStart, start) : "";
-		const filters = dict.match(/\/Filter\s*(\[[^\]]*\]|\/\w+)/)?.[1] ?? "";
+		// Only look a short way back for `<<`: an unbounded lookback rescans the file once per stream.
+		const near = src.slice(Math.max(0, start - MAX_DICT_BYTES), start);
+		const dictStart = near.lastIndexOf("<<");
+		const dict = dictStart >= 0 ? near.slice(dictStart) : "";
+		scanned += dict.length;
+		const filters = dict.match(/\/Filter\s*(\[[^\]]{0,200}\]|\/\w+)/)?.[1] ?? "";
 		if (!/\/Subtype\s*\/Image/.test(dict) || filters.replace(/[[\]\s]/g, "") !== "/DCTDecode") continue;
 		let body = start + 6;
 		if (src[body] === "\r") body++;

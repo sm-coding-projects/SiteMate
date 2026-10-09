@@ -40,7 +40,9 @@ vi.mock("@clerk/hono", () => ({
 	getAuth: (c: { req: { header: (n: string) => string | undefined } }) => {
 		const raw = c.req.header("x-test-user");
 		if (!raw) return { userId: null, sessionClaims: null };
-		const u = JSON.parse(raw) as { id: string; email: string; name?: string; role?: string };
-		return { userId: u.id, sessionClaims: { email: u.email, name: u.name, role: u.role } };
+		const u = JSON.parse(raw) as { id: string; email: string; name?: string; role?: string; iat?: number };
+		// `iat` defaults to a token issued just now; tests pass an older one to play a token issued earlier.
+		const iat = u.iat ?? Math.floor(Date.now() / 1000);
+		return { userId: u.id, sessionClaims: { email: u.email, name: u.name, role: u.role, iat } };
 	},
 }));

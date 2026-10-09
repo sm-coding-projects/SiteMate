@@ -1,7 +1,7 @@
 import { env } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import type { ProjectDetail, Team } from "../src/shared/api-types";
-import { ADMIN, api, createProject, VIEWER } from "./helpers";
+import { ADMIN, api, createProject, type TestUser, VIEWER } from "./helpers";
 import { fakeClerk } from "./mock-clerk";
 
 /** Every write route in the API. Viewers must get 403 on all of them, before validation or lookups. */
@@ -244,5 +244,82 @@ describe("team management (admin)", () => {
 			body: { role: "viewer" },
 		});
 		expect(self.status).toBe(400);
+	});
+});
+
+describe("role changes and session tokens issued before them", () => {
+	// Storage is shared across this file's tests, so each one gets its own member.
+	const member = (key: string, role: string) => ({
+		id: `user_${key}`,
+		email: `${key}@example.com`,
+		name: key,
+		role,
+	});
+	const secondsAgo = (s: number) => Math.floor(Date.now() / 1000) - s;
+	const roleOf = async (as: TestUser) => (await api<{ role: string }>("/me", { as })).body.role;
+	const row = (id: string) =>
+		env.DB.prepare("select role, role_changed_at from users where id = ?")
+			.bind(id)
+			.first<{ role: string; role_changed_at: number | null }>();
+	const setRole = (as: TestUser, id: string, role: string) =>
+		api(`/admin/users/${id}/role`, { as, method: "PATCH", body: { role } });
+	const optOut = (as: TestUser) =>
+		api("/me/preferences", { as, method: "PATCH", body: { emailNotifications: false } });
+	const clerkUser = (u: TestUser) =>
+		({ id: u.id, primaryEmailAddress: { emailAddress: u.email }, emailAddresses: [] }) as never;
+
+	it("a demoted admin's earlier token is a viewer at once and can't write admin back or re-promote", async () => {
+		const other = member("demoted_in_app", "admin");
+		// Their current token, issued 30 s ago and valid for another 30 s.
+		const oldToken = { ...other, iat: secondsAgo(30) };
+		expect(await roleOf(oldToken)).toBe("admin");
+		fakeClerk.users.updateUserMetadata.mockResolvedValueOnce(clerkUser(other));
+		expect((await setRole(ADMIN, other.id, "viewer")).status).toBe(200);
+		const demoted = await row(other.id);
+		expect(demoted?.role).toBe("viewer");
+
+		expect(await roleOf(oldToken)).toBe("viewer");
+		expect((await setRole(oldToken, other.id, "admin")).status).toBe(403);
+		// A preference write bumps updated_at, which doesn't move the role gate.
+		expect((await optOut(oldToken)).status).toBe(200);
+		expect(await roleOf(oldToken)).toBe("viewer");
+		expect(await row(other.id)).toEqual(demoted);
+		expect(fakeClerk.users.updateUserMetadata).not.toHaveBeenCalledWith(other.id, {
+			publicMetadata: { role: "admin" },
+		});
+	});
+
+	it("a demotion made in Clerk sticks once a newer token carries it, despite preference writes", async () => {
+		const other = member("demoted_in_clerk", "admin");
+		const oldToken = { ...other, iat: secondsAgo(30) };
+		expect(await roleOf(oldToken)).toBe("admin");
+		// Demoted in the Clerk dashboard: Clerk now issues viewer tokens. The old token bumps updated_at first.
+		const newToken = { ...other, role: "viewer", iat: secondsAgo(0) };
+		expect((await optOut(oldToken)).status).toBe(200);
+		expect((await row(other.id))?.role_changed_at).toBeNull();
+		expect(await roleOf(newToken)).toBe("viewer");
+		const demoted = await row(other.id);
+		expect(demoted?.role).toBe("viewer");
+
+		expect((await optOut(oldToken)).status).toBe(200);
+		expect(await roleOf(oldToken)).toBe("viewer");
+		expect((await setRole(oldToken, other.id, "admin")).status).toBe(403);
+		expect(await roleOf(newToken)).toBe("viewer");
+		expect(await row(other.id)).toEqual(demoted);
+	});
+
+	it("a promoted viewer's earlier token stays a viewer, without undoing the promotion", async () => {
+		const other = member("promoted_in_app", "viewer");
+		const oldToken = { ...other, iat: secondsAgo(30) };
+		expect(await roleOf(oldToken)).toBe("viewer");
+		fakeClerk.users.updateUserMetadata.mockResolvedValueOnce(clerkUser(other));
+		expect((await setRole(ADMIN, other.id, "admin")).status).toBe(200);
+
+		expect(await roleOf(oldToken)).toBe("viewer");
+		expect((await api("/projects", { as: oldToken, method: "POST", body: { name: "x" } })).status).toBe(403);
+		expect((await row(other.id))?.role).toBe("admin");
+		// Clerk's next token is issued after the promotion (iat is whole seconds, so the next second).
+		const newToken = { ...other, role: "admin", iat: secondsAgo(-1) };
+		expect(await roleOf(newToken)).toBe("admin");
 	});
 });

@@ -50,6 +50,9 @@ export const users = sqliteTable("users", {
 	email: text("email").notNull(),
 	name: text("name"),
 	role: text("role", { enum: ROLES }).notNull().default("viewer"),
+	/** When `role` last changed: by an admin, or from a newer session token. A token issued before this carries a
+	 * stale role, which requireUser won't let overwrite or outrank this one. Other writes leave it alone. */
+	roleChangedAt: integer("role_changed_at"),
 	/** Opt-out for notification emails (Account page). */
 	emailNotifications: integer("email_notifications", { mode: "boolean" }).notNull().default(true),
 	/** Set when an admin removes their access (the Clerk user is banned). Blocks the API and notifications. */
